@@ -1,5 +1,6 @@
 const RESERVED: u32 = 0b00000111111111111111111111111111;
 
+// Used for 9x9 board. It's preferrable to use simple u16 for 3x3 boards.
 #[derive(Clone, Copy, Debug)]
 pub struct Bitboard {
     pub rows: [u32; 3]  /* 27-bit * 3 = 81 */
@@ -17,7 +18,7 @@ impl Bitboard {
         self.rows = [0, 0, 0];
     }
 
-    fn default() -> Bitboard {
+    pub fn default() -> Bitboard {
         Self {
             rows: [0, 0, 0]
         }
@@ -79,9 +80,17 @@ impl Bitboard {
     }
 }
 
-/* Trait implementation */
+/* Trait implementations for bitboards */
 
 impl Eq for Bitboard {}
+
+impl PartialEq for Bitboard {
+    fn eq(&self, other: &Self) -> bool {
+        (self.rows[0] & RESERVED) == (other.rows[0] & RESERVED) && 
+        (self.rows[1] & RESERVED) == (other.rows[1] & RESERVED) && 
+        (self.rows[2] & RESERVED) == (other.rows[2] & RESERVED)
+    }
+}
 
 impl std::ops::BitAnd for Bitboard {
     type Output = Self;
@@ -197,11 +206,47 @@ impl std::ops::ShrAssign<usize> for Bitboard {
     }
 }
 
-impl PartialEq for Bitboard {
-    fn eq(&self, other: &Self) -> bool {
-        (self.rows[0] & RESERVED) == (other.rows[0] & RESERVED) && 
-        (self.rows[1] & RESERVED) == (other.rows[1] & RESERVED) && 
-        (self.rows[2] & RESERVED) == (other.rows[2] & RESERVED)
+/* Trait implementations for primivites */
+
+pub trait DelBit<T> {
+    fn del_bit(&mut self, bit: u8);
+}
+
+pub trait GetBit<T> {
+    fn get_bit(&self, bit: u8) -> Self;
+}
+
+pub trait SetBit<T> {
+    fn set_bit(&mut self, bit: u8);
+}
+
+pub trait PopBit<T> {
+    fn pop_bit(&mut self) -> u8;
+}
+
+impl DelBit<&u8> for u16 {
+    fn del_bit(&mut self, bit: u8) {
+        *self &= !(1 << bit);
+    }
+}
+
+impl GetBit<&u8> for u16 {
+    fn get_bit(&self, bit: u8) -> Self {
+        *self & (1 << bit)
+    }
+}
+
+impl SetBit<&u8> for u16 {
+    fn set_bit(&mut self, bit: u8) {
+        *self |= 1 << bit;
+    }
+}
+
+impl PopBit<&u8> for u16 {
+    fn pop_bit(&mut self) -> u8 {
+        let tz = self.trailing_zeros() as u8;
+        *self &= *self - 1;
+        tz
     }
 }
 
@@ -362,5 +407,23 @@ mod tests {
         let res3 = bb1.pop_bit();
         assert_eq!(bb1, Bitboard::init(&[0, 0, 0]));
         assert_eq!(res3, 80);
+    }
+
+    #[test]
+    fn primitives_util() {
+        let mut val: u16 = 0;
+        val.set_bit(0);
+        val.set_bit(2);
+        assert_eq!(val, 5);
+        val.del_bit(1);
+        val.del_bit(0);
+        assert_eq!(val, 4);
+        val.set_bit(3);
+        assert_eq!(val.get_bit(0), 0);
+        assert_eq!(val.get_bit(2), 4);
+        assert_eq!(val.pop_bit(), 2);
+        assert_eq!(val, 8);
+        assert_eq!(val.pop_bit(), 3);
+        assert_eq!(val, 0);
     }
 }
