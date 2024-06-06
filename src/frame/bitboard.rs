@@ -6,9 +6,9 @@ pub struct Bitboard {
 }
 
 impl Bitboard {
-    fn default() -> Bitboard {
+    pub fn bit() -> Bitboard {
         Self {
-            rows: [0, 0, 0]
+            rows: [0, 0, 1]
         }
     }
     
@@ -17,9 +17,19 @@ impl Bitboard {
         self.rows = [0, 0, 0];
     }
 
-    // pub fn get_bit(&self, bit: usize) -> Self {
-        
-    // }
+    fn default() -> Bitboard {
+        Self {
+            rows: [0, 0, 0]
+        }
+    }
+
+    pub fn del_bit(&mut self, bit: usize) {
+        *self &= !(Self::bit() << bit);
+    }
+
+    pub fn get_bit(&self, bit: usize) -> Self {
+        *self & (Self::bit() << bit)
+    }
 
     #[inline]
     pub fn get_row(&self, index: usize) -> u32 {
@@ -37,55 +47,25 @@ impl Bitboard {
         }
     }
 
-    pub fn left_shift(&mut self, bits: usize) {
-        if bits > 26 {
-            if bits > 53 {
-                self.rows[0] = self.rows[2] << (bits - 54);
-                self.rows[1] = 0;
-            } else {
-                self.rows[0] = (self.rows[1] << (bits - 27)) | ((self.rows[2] & RESERVED) >> (54 - bits));
-                self.rows[1] = self.rows[2] << (bits - 27);
-            }
-            self.rows[2] = 0;
-        } else {
-            self.rows[0] = (self.rows[0] << bits) | ((self.rows[1] & RESERVED) >> (27 - bits));
-            self.rows[1] = (self.rows[1] << bits) | ((self.rows[2] & RESERVED) >> (27 - bits));
-            self.rows[2] <<= bits;
-        }
-    }
-
     pub fn pop_bit(&mut self) -> usize {
         let mut bit: usize = 81;
-        if self.rows[0] & RESERVED != 0 {
-            self.rows[0] &= self.rows[0] - 1;
-            bit = u32::trailing_zeros(self.rows[0]) as usize;
+        if self.rows[2] & RESERVED != 0 {
+            bit = u32::trailing_zeros(self.rows[2]) as usize;
+            self.rows[2] &= self.rows[2] - 1;
         }
         else if self.rows[1] & RESERVED != 0 {
-            self.rows[1] &= self.rows[1] - 1;
             bit = u32::trailing_zeros(self.rows[1]) as usize + 27;
+            self.rows[1] &= self.rows[1] - 1;
         }
-        else if self.rows[2] & RESERVED != 0 {
-            self.rows[2] &= self.rows[2] - 1;
-            bit = u32::trailing_zeros(self.rows[2]) as usize + 54;
+        else if self.rows[0] & RESERVED != 0 {
+            bit = u32::trailing_zeros(self.rows[0]) as usize + 54;
+            self.rows[0] &= self.rows[0] - 1;
         }
         return bit;
     }
 
-    pub fn right_shift(&mut self, bits: usize) {
-        if bits > 26 {
-            if bits > 53 {
-                self.rows[2] = (self.rows[0] & RESERVED) >> (bits - 54);
-                self.rows[1] = 0;
-            } else {
-                self.rows[2] = ((self.rows[1] & RESERVED) >> (bits - 27)) | (self.rows[0] << (54 - bits));
-                self.rows[1] = (self.rows[0] & RESERVED) >> (bits - 27);
-            }
-            self.rows[0] = 0;
-        } else {
-            self.rows[2] = ((self.rows[2] & RESERVED) >> bits) | (self.rows[1] << (27 - bits));
-            self.rows[1] = ((self.rows[1] & RESERVED) >> bits) | (self.rows[0] << (27 - bits));
-            self.rows[0] = (self.rows[0] & RESERVED) >> bits;
-        }
+    pub fn set_bit(&mut self, bit: usize) {
+        *self |= Self::bit() << bit;
     }
 
     #[inline]
@@ -100,6 +80,8 @@ impl Bitboard {
 }
 
 /* Trait implementation */
+
+impl Eq for Bitboard {}
 
 impl std::ops::BitAnd for Bitboard {
     type Output = Self;
@@ -149,13 +131,69 @@ impl std::ops::BitXorAssign for Bitboard {
     }
 }
 
-impl Eq for Bitboard {}
-
 impl std::ops::Not for Bitboard {
     type Output = Self;
 
     fn not(self) -> Self::Output {
         Self::init(&[!self.rows[0], !self.rows[1], !self.rows[2]])
+    }
+}
+
+impl std::ops::Shl<usize> for Bitboard {
+    type Output = Self;
+
+    fn shl(self, shift: usize) -> Self::Output {
+        let mut bb = self.clone();
+        bb <<= shift;
+        bb
+    }
+}
+
+impl std::ops::ShlAssign<usize> for Bitboard {
+    fn shl_assign(&mut self, shift: usize) {
+        if shift > 26 {
+            if shift > 53 {
+                self.rows[0] = self.rows[2] << (shift - 54);
+                self.rows[1] = 0;
+            } else {
+                self.rows[0] = (self.rows[1] << (shift - 27)) | ((self.rows[2] & RESERVED) >> (54 - shift));
+                self.rows[1] = self.rows[2] << (shift - 27);
+            }
+            self.rows[2] = 0;
+        } else {
+            self.rows[0] = (self.rows[0] << shift) | ((self.rows[1] & RESERVED) >> (27 - shift));
+            self.rows[1] = (self.rows[1] << shift) | ((self.rows[2] & RESERVED) >> (27 - shift));
+            self.rows[2] <<= shift;
+        }
+    }
+}
+
+impl std::ops::Shr<usize> for Bitboard {
+    type Output = Self;
+
+    fn shr(self, shift: usize) -> Self::Output {
+        let mut bb = self.clone();
+        bb >>= shift;
+        bb
+    }
+}
+
+impl std::ops::ShrAssign<usize> for Bitboard {
+    fn shr_assign(&mut self, shift: usize) {
+        if shift > 26 {
+            if shift > 53 {
+                self.rows[2] = (self.rows[0] & RESERVED) >> (shift - 54);
+                self.rows[1] = 0;
+            } else {
+                self.rows[2] = ((self.rows[1] & RESERVED) >> (shift - 27)) | (self.rows[0] << (54 - shift));
+                self.rows[1] = (self.rows[0] & RESERVED) >> (shift - 27);
+            }
+            self.rows[0] = 0;
+        } else {
+            self.rows[2] = ((self.rows[2] & RESERVED) >> shift) | (self.rows[1] << (27 - shift));
+            self.rows[1] = ((self.rows[1] & RESERVED) >> shift) | (self.rows[0] << (27 - shift));
+            self.rows[0] = (self.rows[0] & RESERVED) >> shift;
+        }
     }
 }
 
@@ -239,54 +277,90 @@ mod tests {
         let bb8 = Bitboard::init(&[0b0000, 0b0000, 0b1100]);
 
         let mut bb9 = bb1.clone();
-        bb9.left_shift(1);
+        bb9 <<= 1;
         assert_eq!(bb2, bb9);
 
         let mut bb9_2 = bb1.clone();
-        bb9_2.left_shift(2);
-        bb9_2.right_shift(1);
+        bb9_2 <<= 2;
+        bb9_2 >>= 1;
         assert_eq!(bb2, bb9_2);
 
         let mut bb10 = bb1.clone();
-        bb10.left_shift(27);
+        bb10 <<= 27;
         assert_eq!(bb3, bb10);
 
         let mut bb10_2 = bb1.clone();
-        bb10_2.left_shift(1);
-        bb10_2.left_shift(26);
+        bb10_2 <<= 1;
+        bb10_2 <<= 26;
         assert_eq!(bb3, bb10_2);
 
         let mut bb11 = bb1.clone();
-        bb11.left_shift(54);
+        bb11 <<= 54;
         assert_eq!(bb4, bb11);
 
         let mut bb12 = bb1.clone();
-        bb12.left_shift(80);
+        bb12 <<= 80;
         assert_eq!(bb5, bb12);
 
         let mut bb13 = bb1.clone();
-        bb13.right_shift(80);
+        bb13 >>= 80;
         assert_eq!(bb5, bb13);
 
         let mut bb14 = bb1.clone();
-        bb14.right_shift(27);
+        bb14 >>= 27;
         assert_eq!(bb6, bb14);
 
         let mut bb15 = bb1.clone();
-        bb15.right_shift(55);
+        bb15 >>= 55;
         assert_eq!(bb7, bb15);
 
         let mut bb16 = bb1.clone();
-        bb16.right_shift(53);
+        bb16 >>= 53;
         assert_eq!(bb8, bb16);
 
         let mut bb17 = bb6.clone();
         let mut bb18 = bb6.clone();
-        bb17.left_shift(26);
-        bb18.left_shift(40);
+        bb17 <<= 26;
+        bb18 <<= 40;
         for _ in 0..14 {
-            bb18.right_shift(1);
+            bb18 >>= 1;
         }
         assert_eq!(bb17, bb18);
+
+        let mut bb19 = bb1.clone();
+        bb19 <<= 1;
+        assert_eq!(bb19 >> 1, bb1);
+        bb19 >>= 2;
+        assert_eq!(bb19 << 1, bb1);
+    }
+
+    #[test]
+    fn bitboard_util() {
+        let mut bb1 = Bitboard::default();
+        bb1.set_bit(1);
+        bb1.set_bit(27);
+        bb1.set_bit(80);
+        assert_eq!(bb1, Bitboard::init(&[1 << 26, 1, 2]));
+        assert_eq!(bb1.get_bit(0), Bitboard::default());
+        assert_eq!(bb1.get_bit(1), Bitboard::init(&[0, 0, 2]));
+        assert_eq!(bb1.get_bit(26), Bitboard::default());
+        assert_eq!(bb1.get_bit(27), Bitboard::init(&[0, 1, 0]));
+        assert_eq!(bb1.get_bit(28), Bitboard::default());
+        assert_eq!(bb1.get_bit(80), Bitboard::init(&[1 << 26, 0, 0]));
+        assert_eq!(bb1.get_bit(79), Bitboard::default());
+        bb1.del_bit(27);
+        assert_eq!(bb1.get_bit(27), Bitboard::default());
+        bb1.set_bit(27);
+
+        assert_eq!(bb1, Bitboard::init(&[1 << 26, 1, 2]));
+        let res1 = bb1.pop_bit();
+        assert_eq!(bb1, Bitboard::init(&[1 << 26, 1, 0]));
+        assert_eq!(res1, 1);
+        let res2 = bb1.pop_bit();
+        assert_eq!(bb1, Bitboard::init(&[1 << 26, 0, 0]));
+        assert_eq!(res2, 27);
+        let res3 = bb1.pop_bit();
+        assert_eq!(bb1, Bitboard::init(&[0, 0, 0]));
+        assert_eq!(res3, 80);
     }
 }
