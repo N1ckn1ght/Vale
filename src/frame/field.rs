@@ -8,6 +8,6 @@ pub struct Field {
 impl Field {
 
     pub fn make_null_move(&mut self) {
-        self.turn != self.turn;
+        self.turn = !self.turn;
     }
 }
