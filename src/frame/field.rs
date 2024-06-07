@@ -1,10 +1,11 @@
-use super::bitboard::{Bitboard, DelBit};
+use super::{bitboard::*, lookups::Lookups};
 
 pub struct Field {
-    bitboards:  [Bitboard; 2], // bitboards for X and O respectively
-    secured:    [u16; 3],      // 0b0000000AAAAAAAAA - board of finished boards, 3rd board means it's draw
-    turn:       bool,          // is current move for O?
-    history:    Vec<u8>        // history of made moves (null moves are not included as they are unmakeable by themselves)
+    bitboards: [Bitboard; 2], // bitboards for X and O respectively
+    secured:   [u16; 3],      // 0b0000000AAAAAAAAA - board of finished boards, 3rd board means it's draw
+    turn:      bool,          // is current move for O?
+    history:   Vec<u8>,       // history of made moves (null moves are not included as they are unmakeable by themselves)
+    lookups:   Lookups
 }
 
 impl Field {
@@ -13,7 +14,8 @@ impl Field {
             bitboards: [Bitboard::default(); 2],
             secured: [0; 3],
             turn: false,
-            history: Vec::default()
+            history: Vec::default(),
+            lookups: Lookups::default()
         }
     }
 

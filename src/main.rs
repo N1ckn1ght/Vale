@@ -1,5 +1,9 @@
 mod frame;
 
+use frame::field::Field;
+
 fn main() {
-    println!("Hello, world!");
+    let mut field = Field::default();
+
+    field.null_move();
 }
