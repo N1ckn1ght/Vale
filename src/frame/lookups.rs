@@ -8,10 +8,10 @@ pub struct Lookups {
     sides:         u16,                  // sides of small board, 0x0-x0x-0x0
     center:        u16,                  // simply center bit, which is 000-0x0-000
     large_mirrors: [u16; 512],           // only 9-bit rows (9 bits from 27/32), otherwise it's too large
-    large_flips:   [[Bitboard; 512]; 9], // only by 9-bit rows (9 bits from 9x9), otherwise it's too large
+    large_rotates: [[Bitboard; 512]; 9], // only by 9-bit rows (9 bits from 9x9), otherwise it's too large
                                          // these are CLOCKWISE flips! Do 3 of them to get COUNTER-CLOCKWISE. 4 is 0
     small_mirrors: [u16; 512],           // mirror full (!) board (3x3)
-    small_flips:   [u16; 512],           // flip full (!) board (3x3)
+    small_rotates: [u16; 512],           // flip full (!) board (3x3)
                                          // these are CLOCKWISE flips! Do 3 of them to get COUNTER-CLOCKWISE. 4 is 0
 }
 
@@ -31,7 +31,7 @@ impl Lookups {
             large_mirrors[shifted as usize] = i;
         }
 
-        let mut large_flips = [[Bitboard::default(); 512]; 9];
+        let mut large_rotates = [[Bitboard::default(); 512]; 9];
         for i in 0..9 {
             for j in 0..512 {
                 let mut bits = j;
@@ -40,16 +40,17 @@ impl Lookups {
                     let bit = bits.pop_bit();
                     shifted.set_bit(1 << (bit * 9 + 8 - i));
                 }
-                large_flips[i as usize][j as usize] |= shifted;
+                large_rotates[i as usize][j as usize] |= shifted;
             }
         }
 
         let mut small_mirrors = [0; 512];
+        // 123 456 789 -> 321 654 987
         for i in 0..512 {
-
+            
         }
 
-        let mut small_flips = [0; 512];
+        let mut small_rotates = [0; 512];
         for i in 0..512 {
 
         }
@@ -62,9 +63,9 @@ impl Lookups {
             sides: 0b010101010,
             center: 0b000010000,
             large_mirrors,
-            large_flips,
+            large_rotates,
             small_mirrors,
-            small_flips
+            small_rotates
         }
     }
 }
