@@ -1,6 +1,21 @@
 const RESERVED: u32 = 0b00000111111111111111111111111111;
 
 // Used for 9x9 board. It's preferrable to use simple u16 for 3x3 boards.
+// Basically, every row is a small board; e.g., least 9 bits is for down-right board.
+/*
+    80 79 78 71 70 69 62 61 60  - 5 leading bits lost -  80 79 78 77 76 75 74 73 72
+    77 76 75 68 67 66 59 58 57                           71 70 69 68 67 66 65 64 63
+    74 73 72 65 64 63 56 55 54                           62 61 60 59 58 57 56 55 54
+
+    53 52 51 44 43 42 35 34 33  - 5 leading bits lost -  53 52 51 50 49 48 47 46 45
+    50 49 48 41 40 39 32 31 30                           44 43 42 41 40 39 38 37 36
+    47 46 45 38 37 36 29 28 27                           35 34 33 32 31 30 29 28 27
+
+    26 25 24 17 16 15  8  7  6  - 5 leading bits lost -  26 25 24 23 22 21 20 19 18
+    23 22 21 14 13 12  5  4  3                           17 16 15 14 13 12 11 10  9
+    20 19 18 11 10  9  2  1  0                            8  7  6  5  4  3  2  1  0
+*/
+
 #[derive(Clone, Copy, Debug)]
 pub struct Bitboard {
     pub rows: [u32; 3]  /* 27-bit * 3 = 81 */
@@ -24,10 +39,12 @@ impl Bitboard {
         }
     }
 
+    #[inline]
     pub fn del_bit(&mut self, bit: usize) {
         *self &= !(Self::bit() << bit);
     }
 
+    #[inline]
     pub fn get_bit(&self, bit: usize) -> Self {
         *self & (Self::bit() << bit)
     }
@@ -40,6 +57,11 @@ impl Bitboard {
     #[inline]
     pub fn get_rows(&self) -> [u32; 3] {
         self.rows.clone()
+    }
+
+    pub fn get_small_board(&self, index: usize) -> u16 {
+        let board = self.clone() >> (index * 9);
+        return (board.get_row(2) & 0b111111111) as u16
     }
 
     pub fn init(values: &[u32; 3]) -> Self {
@@ -65,6 +87,7 @@ impl Bitboard {
         return bit;
     }
 
+    #[inline]
     pub fn set_bit(&mut self, bit: usize) {
         *self |= Self::bit() << bit;
     }
@@ -258,8 +281,7 @@ impl SwapBits<&u8> for u16 {
     fn swap_bits(&mut self, first: u8, second: u8) {
         let fb = self.get_bit(first);
         let sb = self.get_bit(second);
-        self.del_bit(first);
-        self.del_bit(second);
+        *self &= !(fb | sb);
         if fb != 0 {
             self.set_bit(second);
         }
@@ -396,6 +418,11 @@ mod tests {
         assert_eq!(bb19 >> 1, bb1);
         bb19 >>= 2;
         assert_eq!(bb19 << 1, bb1);
+
+        let mut crashtest = Bitboard::bit();
+        crashtest <<= 80;
+        crashtest >>= 80;
+        assert_eq!(crashtest, Bitboard::bit());
     }
 
     #[test]
