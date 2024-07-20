@@ -1,5 +1,5 @@
-pub const DIV_LOOKUP: [usize; 9] = [0, 0, 0, 1, 1, 1, 2, 2, 2];
-pub const MOD_LOOKUP: [usize; 9] = [0, 1, 2, 0, 1, 2, 0, 1, 2];
+// pub const DIV_LOOKUP: [usize; 9] = [0, 0, 0, 1, 1, 1, 2, 2, 2];
+// pub const MOD_LOOKUP: [usize; 9] = [0, 1, 2, 0, 1, 2, 0, 1, 2];
 
 /* Bitboard traits for primivites */
 
@@ -46,6 +46,7 @@ impl SetBit<&u8> for u16 {
     }
 }
 
+// returns index of the last bit and pops said bit
 impl PopBit<&u8> for u16 {
     #[inline]
     fn pop_bit(&mut self) -> u8 {

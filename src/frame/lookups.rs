@@ -1,15 +1,15 @@
 use super::bitboard::SwapBits;
 
 pub struct Lookups {
-    diag_lines:    [u16; 2],  // diagonal lines, x00-0x0-00x and 00x-0x0-x00
-    side_lines:    [u16; 4],  // side lines, such as xxx-000-000, etc.
-    cent_lines:    [u16; 2],  // center horizontal and vertical lines
-    all_lines:     [u16; 8],  // a bit naive in terms of memory, but to make things simplier later     
-    corners:       u16,       // corners of small board, x0x-000-x0x
-    sides:         u16,       // sides of small board, 0x0-x0x-0x0
-    center:        u16,       // simply center bit, which is 000-0x0-000
-    mirrors: [u16; 512],      // mirror of a sub board (3x3)
-    rotates: [u16; 512],      // rotate of a sub board (3x3, clockwise)
+    diag_lines: [u16; 2],    // diagonal lines, x00-0x0-00x and 00x-0x0-x00
+    side_lines: [u16; 4],    // side lines, such as xxx-000-000, etc.
+    cent_lines: [u16; 2],    // center horizontal and vertical lines
+    all_lines:  [u16; 8],    // a bit naive in terms of memory, but to make things simplier later     
+    corners:    u16,         // corners of small board, x0x-000-x0x
+    sides:      u16,         // sides of small board, 0x0-x0x-0x0
+    center:     u16,         // simply center bit, which is 000-0x0-000
+    mirrors:    [u16; 512],  // mirror of a sub board (3x3)
+    rotates:    [u16; 512],  // rotate of a sub board (3x3, clockwise)
 }
 
 impl Lookups {
