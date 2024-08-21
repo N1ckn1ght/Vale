@@ -8,7 +8,7 @@ fn main() {
 
     let timer = Instant::now();
     let mut mvc: u64 = 0;
-    for i in 1..=9 {
+    for i in 1..=8 {
         let cmvc = fd.perft(i);
         println!("depth = {}, legal moves counted = {}", i, cmvc);
         mvc += cmvc;

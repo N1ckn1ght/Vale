@@ -106,8 +106,7 @@ impl Field {
         self.turn = !self.turn;
         self.locals[self.turn as usize] = self.history.last().unwrap() & LF;
         let mov = (self.history.pop().unwrap() >> 96) as usize;
-        self.global[0].del_bit(DIV_LOOKUP[mov]);
-        self.global[1].del_bit(DIV_LOOKUP[mov]);
+        self.global[self.turn as usize].del_bit(DIV_LOOKUP[mov]);
         self.global[2].del_bit(DIV_LOOKUP[mov]);
         self.status = 3;
     }
