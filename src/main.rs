@@ -1,8 +1,7 @@
-use std::time::Instant;
-
-use frame::field::Field;
-
 mod frame;
+
+use std::time::Instant;
+use frame::field::Field;
 
 fn main() {
     let mut fd = Field::default();
@@ -16,7 +15,5 @@ fn main() {
     }
     let time = timer.elapsed().as_millis() as u64;
     println!("moves = {}, time = {} ms", mvc, time);
-    println!("speed = {}.{}kps", mvc / time / 1000, mvc / time % 10);
-    // 214.4 kps, FAIL
-    // println!("depth = {}, legal moves counted = {}", 100, fd.perft(100));
+    println!("speed = {}.{}mps", mvc / time / 1000, mvc / time % 1000);
 }

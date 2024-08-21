@@ -1,6 +1,28 @@
 use super::bitboard::SwapBits;
 
-pub struct Lookups {
+pub const DIV_LOOKUP: [u8; 81] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 
+                                  1, 1, 1, 1, 1, 1, 1, 1, 1,
+                                  2, 2, 2, 2, 2, 2, 2, 2, 2,
+                                  3, 3, 3, 3, 3, 3, 3, 3, 3,
+                                  4, 4, 4, 4, 4, 4, 4, 4, 4,
+                                  5, 5, 5, 5, 5, 5, 5, 5, 5,
+                                  6, 6, 6, 6, 6, 6, 6, 6, 6,
+                                  7, 7, 7, 7, 7, 7, 7, 7, 7,
+                                  8, 8, 8, 8, 8, 8, 8, 8, 8,
+                                 ];
+
+pub const SUB_LOOKUP: [u128; 9] = [0b111111111000000000000000000000000000000000000000000000000000000000000000000000000,
+                                   0b000000000111111111000000000000000000000000000000000000000000000000000000000000000,
+                                   0b000000000000000000111111111000000000000000000000000000000000000000000000000000000,
+                                   0b000000000000000000000000000111111111000000000000000000000000000000000000000000000,
+                                   0b000000000000000000000000000000000000111111111000000000000000000000000000000000000,
+                                   0b000000000000000000000000000000000000000000000111111111000000000000000000000000000,
+                                   0b000000000000000000000000000000000000000000000000000000111111111000000000000000000,
+                                   0b000000000000000000000000000000000000000000000000000000000000000111111111000000000,
+                                   0b000000000000000000000000000000000000000000000000000000000000000000000000111111111
+                                  ];
+
+pub struct GenLookups {
     diag_lines: [u16; 2],    // diagonal lines, x00-0x0-00x and 00x-0x0-x00
     side_lines: [u16; 4],    // side lines, such as xxx-000-000, etc.
     cent_lines: [u16; 2],    // center horizontal and vertical lines
@@ -12,7 +34,7 @@ pub struct Lookups {
     rotates:    [u16; 512],  // rotate of a sub board (3x3, clockwise)
 }
 
-impl Lookups {
+impl GenLookups {
     pub fn default() -> Self {
         let diag_lines: [u16; 2] = [0b001010100, 0b100010001];
         let side_lines: [u16; 4] = [0b000000111, 0b001001001, 0b100100100, 0b111000000];
@@ -107,7 +129,7 @@ mod tests {
 
     #[test]
     fn lookups_mirrors() {
-        let lookups = Lookups::default();
+        let lookups = GenLookups::default();
 
         let board: u16 = 0b110101001;
         assert_eq!(lookups.mirrors[board as usize], 0b011101100);
@@ -120,7 +142,7 @@ mod tests {
 
     #[test]
     fn lookups_rotates() {
-        let lookups = Lookups::default();
+        let lookups = GenLookups::default();
         
         let board1: u16 = 0b110101001;
         let mut board2 = lookups.rotates[board1 as usize];
