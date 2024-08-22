@@ -51,7 +51,7 @@ impl Field {
                         let free = char.to_digit(10).unwrap() as u8;
                         j -= free - 1;
                         self.cells_left += free;
-                        self.cl_boarded[i] += free;
+                        self.cl_boarded[8 - i] += free;
                     }
                 }
             }
@@ -83,17 +83,15 @@ impl Field {
         if (self.global[0] | self.global[1] | self.global[2]) & board_mask == 0 {
             return vec![!(self.locals[0][board_index as usize] | self.locals[1][board_index as usize]) & 0b111111111];
         }
-        vec![
-            !(self.locals[0][0] | self.locals[1][0]) & 0b111111111,
-            !(self.locals[0][1] | self.locals[1][1]) & 0b111111111,
-            !(self.locals[0][2] | self.locals[1][2]) & 0b111111111,
-            !(self.locals[0][3] | self.locals[1][3]) & 0b111111111,
-            !(self.locals[0][4] | self.locals[1][4]) & 0b111111111,
-            !(self.locals[0][5] | self.locals[1][5]) & 0b111111111,
-            !(self.locals[0][6] | self.locals[1][6]) & 0b111111111,
-            !(self.locals[0][7] | self.locals[1][7]) & 0b111111111,
-            !(self.locals[0][8] | self.locals[1][8]) & 0b111111111
-        ]
+
+        let mut vec = vec![0; 9];
+        for i in 0..9 {
+            if (self.global[0] | self.global[1] | self.global[2]) & board_mask == 0 {
+                vec[i] = !(self.locals[0][i] | self.locals[1][i]) & 0b111111111
+            }
+        }
+
+        vec
     }
 
     // will return moves transformed into 0xBBBBAAAA format, NOT RECOMMENDED
@@ -143,7 +141,7 @@ impl Field {
 
         let mov = self.history.pop().unwrap();
         let board_index = board_index_extract(mov);
-        // manual operations instead of bitboard methods here, but for saving just a little bit of computations
+        
         let board_mask = 1 << board_index;
         let cell_mask = 1 << cell_index_extract(mov);
 
@@ -152,38 +150,41 @@ impl Field {
         // update independent counter
         self.cl_boarded[board_index as usize] += 1;
         // revert move on a global board, update dependent counter
-        if self.global[self.turn as usize] & board_mask != 0 {
-            self.global[self.turn as usize] &= !board_mask;
-            self.cells_left += self.cl_boarded[board_index as usize];
+        if self.global[self.turn as usize] & board_mask == 0 {
+            self.cells_left += 1;
+            self.global[2] &= !board_mask;
             return;
         }
-        self.global[2] &= !board_mask;
-        self.cells_left += 1;
+        self.global[self.turn as usize] &= !board_mask;
+        self.cells_left += self.cl_boarded[board_index as usize];
     }
 
     fn local_win_check(&mut self, turn: bool, index: u8) {
+        let full = self.cl_boarded[index as usize] == 0;
         // a little optimization
-        if self.cl_boarded[index as usize] > 6 {
+        if !full && skip_thresh(self.locals[turn as usize][index as usize]) {
             return;
         }
         for mask in self.lookups.get_all_lines().iter() {
             if mask & self.locals[turn as usize][index as usize] == *mask {
                 self.global[turn as usize].set_bit(index);
-                self.cells_left -= 9 - (self.locals[0][index as usize] | self.locals[1][index as usize]).count_ones() as u8;
+                self.cells_left -= self.cl_boarded[index as usize];
                 self.global_win_check(turn);
                 return;
             }
         }
-        if self.locals[0][index as usize] & self.locals[1][index as usize] == 0b111111111 {
+        if self.cl_boarded[index as usize] == 0 {
             self.global[2].set_bit(index);
         }
     }
 
     fn global_win_check(&mut self, turn: bool) {
-        for mask in self.lookups.get_all_lines().iter() {
-            if mask & self.global[turn as usize] == *mask {
-                self.status = turn as u8;
-                return;
+        if !skip_thresh(self.global[turn as usize]) {
+            for mask in self.lookups.get_all_lines().iter() {
+                if mask & self.global[turn as usize] == *mask {
+                    self.status = turn as u8;
+                    return;
+                }
             }
         }
         self.status = 2 + (self.cells_left != 0) as u8;
@@ -244,8 +245,49 @@ impl Field {
             while lms[0] != 0 {
                 let bit = lms[0].pop_bit();
                 self.make_move(pack_move(board_index, bit));
+                
+                // debug
+                // let mut cnt2 = 0;
+                // for i in 0..9 {
+                //     if (self.global[0] | self.global[1] | self.global[2]).get_bit(i) != 0 {
+                //         continue;
+                //     }
+                //     cnt2 += self.cl_boarded[i as usize];
+                // }
+                // if cnt2 != self.cells_left {
+                //     println!("after make move");
+                //     println!("{} got, {} expected", self.cells_left, cnt2);
+                //     for i in 0..9 {
+                //         print!("{} ", self.locals[0][i]);
+                //         println!("{}", self.locals[1][i]);
+                //     }
+                //     println!("{} {} {}", self.global[0], self.global[1], self.global[2]);
+                //     panic!();
+                // }
+                //
+
                 cnt += self.perft(depth - 1);
                 self.undo_move();
+
+                // debug
+                // let mut cnt2 = 0;
+                // for i in 0..9 {
+                //     if (self.global[0] | self.global[1] | self.global[2]).get_bit(i) != 0 {
+                //         continue;
+                //     }
+                //     cnt2 += self.cl_boarded[i as usize];
+                // }
+                // if cnt2 != self.cells_left {
+                //     println!("after undo move");
+                //     println!("{} got, {} expected", self.cells_left, cnt2);
+                //     for i in 0..9 {
+                //         print!("{} ", self.locals[0][i]);
+                //         println!("{}", self.locals[1][i]);
+                //     }
+                //     println!("{} {} {}", self.global[0], self.global[1], self.global[2]);
+                //     panic!();
+                // }
+                //
             }
         } else if lms.len() == 9 {
             for (board_index, mut board) in lms.into_iter().enumerate() {
@@ -280,6 +322,18 @@ fn pack_move(board_index: u8, cell_index: u8) -> u8 {
     (cell_index << 4) | board_index
 }
 
+fn skip_thresh(mut board: u16) -> bool {
+    let mut cnt = 0;
+    while board != 0 {
+        board.pop_bit_nr();
+        if cnt == 2 {
+            return false;
+        }
+        cnt += 1;
+    }
+    true
+}
+
 
 #[cfg(test)]
 mod tests {
@@ -303,6 +357,14 @@ mod tests {
         assert_eq!(*fd.get_global_board(), [0; 3]);
         assert_eq!(*fd.get_local_boards(), *fd2.get_local_boards());
         assert_eq!(*fd.get_local_boards(), [[0; 9]; 2]);
+
+        fd.import("2x2x2x-2o2o2o-9-9-9-9-9-9-9");
+        assert_eq!(fd.get_cells_left(), 63);
+        assert_eq!(fd.get_status(), 3);
+        assert_eq!(fd.get_turn(), false);
+        assert_eq!(*fd.get_cells_left_per_local_board(), [9, 9, 9, 9, 9, 9, 9, 6, 6]);
+        assert_eq!(*fd.get_global_board(), [0b100000000, 0b010000000, 0b000000000]);
+        assert_eq!(*fd.get_local_boards(), [[0, 0, 0, 0, 0, 0, 0, 0, 0b1001001], [0, 0, 0, 0, 0, 0, 0, 0b1001001, 0]]);
         
         fd.import("2x2x2x-o3o3o-9-9-4ox3-9-9-9-xxoooxxox");
         assert_eq!(fd.get_cells_left(), 52);

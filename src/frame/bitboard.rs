@@ -19,6 +19,10 @@ pub trait PopBit<T> {
     fn pop_bit(&mut self) -> u8;
 }
 
+pub trait PopBitNR<T> {
+    fn pop_bit_nr(&mut self);
+}
+
 pub trait SwapBits<T> {
     fn swap_bits(&mut self, first: u8, second: u8);
 }
@@ -53,6 +57,13 @@ impl PopBit<&u8> for u16 {
         let tz = self.trailing_zeros() as u8;
         *self &= *self - 1;
         tz
+    }
+}
+
+impl PopBitNR<&u8> for u16 {
+    #[inline]
+    fn pop_bit_nr(&mut self) {
+        *self &= *self - 1;
     }
 }
 
