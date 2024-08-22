@@ -2,7 +2,7 @@ use super::{bitboard::*, lookups::*};
 
 pub struct Field {
     global:   [u16; 3],   // 0b111111111 - board of finished boards, 3rd board means it's draw (9 bits used)
-    locals:   [u128; 2],  // sub-boards, right-to-left, down-to-up, 0 for X, 1 for O (81 bits used)
+    pub locals:   [u128; 2],  // sub-boards, right-to-left, down-to-up, 0 for X, 1 for O (81 bits used)
     status:   u8,         // 0 - X won, 1 - O won, 2 - Draw, 3 - Game still on (could be enum, but "status = turn as usize" is used)\
     turn:     bool,       // is current move for O?
     history:  Vec<u128>,  // field backups: locals[previous_turn] | (mov << 96)
@@ -37,12 +37,13 @@ impl Field {
         }
         
         let last_mov = (self.history.last().unwrap() >> 96) as usize;
-        let overlap = SUB_LOOKUP[DIV_LOOKUP[last_mov] as usize] & free;
-        if overlap != 0 {
-            return overlap;
+        let overlap = free & SUB_LOOKUP[MOD_LOOKUP[last_mov] as usize];
+        
+        if overlap == 0 {
+            return free;
         }
 
-        free
+        overlap
     }
 
     pub fn make_move(&mut self, mov: u8) {
