@@ -1,9 +1,14 @@
 mod frame;
+mod engine;
 
 use std::time::Instant;
 use frame::field::Field;
 
 fn main() {
+    perft();
+}
+
+fn perft() {
     let mut fd = Field::default();
 
     let timer = Instant::now();

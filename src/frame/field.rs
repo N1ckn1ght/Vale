@@ -12,7 +12,7 @@ pub struct Field {
 
 impl Default for Field {
     // generate an emtpy and ready to play field
-    fn default() -> Field {
+    fn default() -> Self {
         Self {
             global: [0; 3],
             locals: [0; 2],
@@ -30,7 +30,7 @@ impl Field {
         self.status = 3;
         self.turn = false;
         self.history = Vec::default();
-        
+
         let parts = ken.split('-');
         let mut bit = 81;
         for part in parts.into_iter() {
@@ -113,16 +113,16 @@ impl Field {
         if self.status < 3 {
             return 0;
         }
-        
+    
         let free = !self.locals[0] & !self.locals[1] & LF;
 
         if self.history.is_empty() {
             return free;
         }
-        
+    
         let last_mov = (self.history.last().unwrap() >> 96) as usize;
         let overlap = free & SUB_LOOKUP[MOD_LOOKUP[last_mov] as usize];
-        
+    
         if overlap == 0 {
             return free;
         }
@@ -199,7 +199,7 @@ impl Field {
 
     pub fn perft(&mut self, depth: u8) -> u64 {
         let mut free = self.generate_legal_moves();
-        
+
         if depth == 1 {
             return free.count_ones() as u64;
         }
@@ -240,7 +240,7 @@ mod tests {
 
         assert_eq!(field1.locals[0], field2.locals[0]);
         assert_eq!(field1.locals[1], field2.locals[1]);
-        
+
         field1.make_move(0);
         field1.make_move(1);
         field1.undo_move();
@@ -253,12 +253,12 @@ mod tests {
     #[test]
     fn field_move_generation() {
         let mut fd = Field::default();
-        
+
         fd.make_move(0);
         assert_eq!(fd.locals[0], 1);
         assert_eq!(fd.locals[1], 0);
         assert_eq!(fd.generate_legal_moves(), 0b111111110);
-        
+
         fd.make_move(1);
         assert_eq!(fd.locals[0], 1);
         assert_eq!(fd.locals[1], 0b10);
@@ -279,7 +279,7 @@ mod tests {
         let mut fd2 = Field::default();
         fd2.import("9-9-9-9-9-9-9-9-7ox");
         assert_eq!(fd1, fd2);
-        
+
         let fd = Field::init("9-9-9-9-o3x4-9-9-9-9");
         assert_eq!(fd.locals[0], 0b000000000000000000000000000000000000000010000000000000000000000000000000000000000);
         assert_eq!(fd.locals[1], 0b000000000000000000000000000000000000100000000000000000000000000000000000000000000);
