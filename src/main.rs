@@ -1,5 +1,5 @@
 mod frame;
-mod engine;
+// mod engine;
 
 use std::time::Instant;
 use frame::field::Field;
@@ -13,7 +13,7 @@ fn perft() {
 
     let timer = Instant::now();
     let mut mvc: u64 = 0;
-    for i in 1..=8 {
+    for i in 1..=9 {
         let cmvc = fd.perft(i);
         println!("depth = {}, legal moves counted = {}", i, cmvc);
         mvc += cmvc;

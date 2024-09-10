@@ -142,9 +142,10 @@ impl Field {
         let my_sub = ((my_overlap >> (gbit * 9)) & LS) as u16;
 
         let mut win_occured = false;
+        let cbit = MOD_LOOKUP[mov as usize] as usize;
 
         if my_sub.count_ones() > 2 {
-            for mask in WIN_LOOKUP.iter() {
+            for mask in WIN_LOOKUP_INDEXED.iter().skip(WIN_LOOKUP_INDICES[cbit][0]).take(WIN_LOOKUP_INDICES[cbit][1]) {
                 if my_sub & mask == *mask {
                     self.global[my_turn].set_bit(gbit);
                     win_occured = true;              
@@ -157,7 +158,7 @@ impl Field {
             let mut global_win_occured = false;
             
             if self.global[my_turn].count_ones() > 2 {
-                for mask in WIN_LOOKUP.iter() {
+                for mask in WIN_LOOKUP_INDEXED.iter().skip(WIN_LOOKUP_INDICES[gbit as usize][0]).take(WIN_LOOKUP_INDICES[gbit as usize][1]) {
                     if self.global[my_turn] & mask == *mask {
                         self.status = my_turn as u8;
                         global_win_occured = true;         
@@ -269,6 +270,24 @@ mod tests {
         assert_eq!(fd.perft(1), 81);
         assert_eq!(fd.perft(2), 720);
         assert_eq!(fd.perft(3), 6336);
+    }
+
+    /* NOT VERIFIED ! */
+    #[test]
+    fn field_move_generation_perft6() {
+        let mut fd = Field::default();
+
+        assert_eq!(fd.perft(4), 55080);
+        assert_eq!(fd.perft(5), 473256);
+        assert_eq!(fd.perft(6), 4017888);
+    }
+
+    /* NOT VERIFIED ! */
+    #[test]
+    fn field_move_generation_perft7() {
+        let mut fd = Field::default();
+
+        assert_eq!(fd.perft(7), 33702480);
     }
 
     #[test]
