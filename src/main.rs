@@ -5,15 +5,15 @@ use std::time::Instant;
 use frame::field::Field;
 
 fn main() {
-    perft();
+    perft(8);
 }
 
-fn perft() {
+fn perft(x: u8) {
     let mut fd = Field::default();
 
     let timer = Instant::now();
     let mut mvc: u64 = 0;
-    for i in 1..=9 {
+    for i in 1..=x {
         let cmvc = fd.perft(i);
         println!("depth = {}, legal moves counted = {}", i, cmvc);
         mvc += cmvc;
