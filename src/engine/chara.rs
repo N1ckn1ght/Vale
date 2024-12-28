@@ -6,9 +6,10 @@ const PLY_LIMIT: usize = 96;   // 81
 const INF: i32 = 1048576;
 
 pub struct Vale {
-    field: Field,
-
+    field:    Field,
+    
     /* Accessible constants */
+    maps:     [u16; 0b1000000000000000000],  // 0b ooooooooo xxxxxxxxx - this format will yield [ ]
 
     /* Search trackers */
     ts:       Instant,                       // timer start
@@ -30,13 +31,16 @@ impl Vale {
         
         Self {
             field,
+            maps: [0; 0b1000000000000000000],
             ts: Instant::now(),
             tl: 0,
             abort: false,
             nodes: 0,
             ply: 0,
             tpv: [[0; PLY_LIMIT]; PLY_LIMIT],
-            tpv_len: [0; PLY_LIMIT]
+            tpv_len: [0; PLY_LIMIT],
+            tpv_flag: false,
+            cur_ply: 0
         }
     }
 
@@ -63,12 +67,15 @@ impl Vale {
         
         loop {
             self.tpv_flag = true;
-            let temp = self.search(alpha, beta, self.cur_depth);
+            // let temp = self.search(alpha, beta, self.cur_depth);
             if !self.abort {
-                score = temp;
+                // score = temp;
             } else {
                 println!()
             }
+            
+
+            break;
         }
     }
 
@@ -79,4 +86,4 @@ impl Vale {
     pub fn eval(&mut self) {
         
     }
-}   
+}

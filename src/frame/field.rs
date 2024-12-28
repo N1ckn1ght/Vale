@@ -2,12 +2,12 @@ use super::{bitboard::*, lookups::*};
 
 #[derive(Debug, Clone)]
 pub struct Field {
-    global:   [u16; 3],   // 0b111111111 - board of finished boards, 3rd board means it's draw (9 bits used)
-    locals:   [u128; 2],  // sub-boards, little-endian, 0 for X, 1 for O (81 bits used)
-    status:   u8,         // 0 - X won, 1 - O won, 2 - Draw, 3 - Game still on (could be enum, but "status = turn as usize" is used)\
-    turn:     bool,       // is current move for O?
-    history:  Vec<u128>,  // field backups: locals[previous_turn] | (mov << 96)
-                          //     null moves are not included, use null_move() method to change the turn
+    pub global:   [u16; 3],   // 0b111111111 - board of finished boards, 3rd board means it's draw (9 bits used)
+    pub locals:   [u128; 2],  // sub-boards, little-endian, 0 for X, 1 for O (81 bits used)
+    pub status:   u8,         // 0 - X won, 1 - O won, 2 - Draw, 3 - Game still on (could be enum, but "status = turn as usize" is used)\
+    pub turn:     bool,       // is current move for O?
+    pub history:  Vec<u128>,  // field backups: locals[previous_turn] | (mov << 96)
+                              //     null moves are not included, use null_move() method to change the turn
 }
 
 impl Default for Field {

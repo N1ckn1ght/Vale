@@ -2,8 +2,8 @@ pub struct Weights {
     pub possibility_limit: i32,
     pub local_threat_mult: i32,
     pub local_win_mult: i32,
-    pub global_emerging_threat_value: i32,
-    pub global_threat_value: i32,
+    pub global_emerging_threat_mult: i32,
+    pub global_threat_mult: i32,
     pub soft_max: i32
 }
 
