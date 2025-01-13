@@ -3,6 +3,7 @@ use crate::frame::lookups::WIN_LOOKUP;
 pub const SHIFT_POS: u8 = 0;
 pub const SHIFT_UPO: u8 = 4;
 pub const SHIFT_THR: u8 = 8;
+pub const SHIFT_REA: u8 = 12;
 pub const MASK_CNT: u16 = 0b1111;
 
 // (x_maps, o_maps)
@@ -105,8 +106,61 @@ mod tests {
     fn gen_maps_manual_sequential_test() {
         let maps = gen_maps();
 
-        let keys = [0b000000000000000000, 0b000000000000000001, 0b000000001000000000, 0b000000000000000010, 0b000000000000000011, 0b000000001000000010, 0b000000010000000000, 0b000000010000000001, 0b000000011000000000, 0b000000000000000100];
-        let values = [(8, 0, 0, 8, 0, 0), (8, 3, 0, 5, 0, 0), (5, 0, 0, 8, 3, 0), (8, 2, 0, 6, 0, 0), (8, 4, 1, 4, 0, 0), (5, 1, 0, 6, 2, 0), (6, 0, 0, 8, 2, 0), (6, 2, 0, 5, 1, 0), (4, 0, 0, 8, 4, 1), (8, 3, 0, 5, 0, 0)];
+        let keys = [
+            0b000000000000000000,
+            0b000000000000000001,
+            0b000000001000000000,
+            0b000000000000000010,
+            0b000000000000000011,
+            0b000000001000000010,
+            0b000000010000000000,
+            0b000000010000000001,
+            0b000000011000000000,
+            0b000000000000000100
+        ];
+        let values = [
+            (8, 0, 0, 8, 0, 0),
+            (8, 3, 0, 5, 0, 0),
+            (5, 0, 0, 8, 3, 0),
+            (8, 2, 0, 6, 0, 0),
+            (8, 4, 1, 4, 0, 0),
+            (5, 1, 0, 6, 2, 0),
+            (6, 0, 0, 8, 2, 0),
+            (6, 2, 0, 5, 1, 0),
+            (4, 0, 0, 8, 4, 1),
+            (8, 3, 0, 5, 0, 0)
+        ];
+
+        for (i, key) in keys.into_iter().enumerate() {
+            // println!("iter={}, key=[{:018b}]\nx=[{:09b}], o=[{:09b}]\n", i, key, maps.0[key], maps.1[key]);
+            let x_pos = (maps.0[key] >> SHIFT_POS) & MASK_CNT;
+            let x_upo = (maps.0[key] >> SHIFT_UPO) & MASK_CNT;
+            let x_thr = (maps.0[key] >> SHIFT_THR) & MASK_CNT;
+            let o_pos = (maps.1[key] >> SHIFT_POS) & MASK_CNT;
+            let o_upo = (maps.1[key] >> SHIFT_UPO) & MASK_CNT;
+            let o_thr = (maps.1[key] >> SHIFT_THR) & MASK_CNT;
+            assert_eq!(x_pos, values[i].0);
+            assert_eq!(x_upo, values[i].1);
+            assert_eq!(x_thr, values[i].2);
+            assert_eq!(o_pos, values[i].3);
+            assert_eq!(o_upo, values[i].4);
+            assert_eq!(o_thr, values[i].5);
+        }
+    }
+
+    #[test]
+    fn gen_maps_manual_random_test() {
+        let maps = gen_maps();
+
+        let keys = [
+            0b000010000100000001,
+            0b001010000100000001,
+        ];
+        let values = [
+            (4, 4, 0, 3, 3, 0),
+            (2, 2, 0, 3, 3, 1),
+        ];
+        
         for (i, key) in keys.into_iter().enumerate() {
             // println!("iter={}, key=[{:018b}]\nx=[{:09b}], o=[{:09b}]\n", i, key, maps.0[key], maps.1[key]);
             let x_pos = (maps.0[key] >> SHIFT_POS) & MASK_CNT;
