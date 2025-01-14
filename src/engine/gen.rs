@@ -31,9 +31,11 @@ pub fn gen_maps() -> (Vec<u16>, Vec<u16>) {
         let mut x_pos = 0;
         let mut x_upo = 0;
         let mut x_thr = 0;
+        let mut x_rea: u16 = 0;
         let mut o_pos = 0;
         let mut o_upo = 0;
         let mut o_thr = 0;
+        let mut o_rea: u16 = 0;
 
         let mut illegal = false;
 
@@ -84,6 +86,11 @@ pub fn gen_maps() -> (Vec<u16>, Vec<u16>) {
             o_pos = 0;
             o_upo = 0;
             o_thr = 0;
+        } else {
+
+            // calc rea
+            
+
         }
 
         // bleh

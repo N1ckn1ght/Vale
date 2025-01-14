@@ -5,6 +5,7 @@ pub struct Weights {
     pub global_emerging_threat_mult: i32,
     pub global_threat_mult: i32,
     pub soft_max: i32
+    // pub discourage_enemy_multithreat: i32
 }
 
 impl Default for Weights {
