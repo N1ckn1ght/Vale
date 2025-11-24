@@ -108,7 +108,7 @@ impl Field {
         fd.import(ken);
         fd
     }
-    
+
     pub fn generate_legal_moves(&self) -> u128 {
         if self.status < 3 {
             return 0;
