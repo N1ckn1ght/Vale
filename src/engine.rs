@@ -7,16 +7,29 @@ const PLY_LIMIT: usize = 96;   // 81
 const INF: i16 = 16384;
 
 // eval weights
-static LEVAL_WEIGHTS: Lazy<[i8; 262144]> = Lazy::new(gen_leval_weights); 
+//pub static LEVAL_WEIGHTS: Lazy<[i8; 262144]> = Lazy::new(gen_leval_weights); 
+pub static LEVAL_WEIGHTS: Lazy<Box<[i8]>> = Lazy::new(|| {
+    let mut v = vec![0i8; 262144];
+    gen_leval_weights(&mut v);
+    v.into_boxed_slice()
+});
 static ANCHOR_WEIGHTS: [i16; 9] = [3, 2, 3, 2, 4, 2, 3, 2, 3];
 const FREE_MOVE_FACT: i16 = 9;
 
 // eval aux
-static LEVAL_XPOS: Lazy<[bool; 262144]> = Lazy::new(gen_leval_xpos);
-static LEVAL_OPOS: Lazy<[bool; 262144]> = Lazy::new(gen_leval_opos);
+pub static LEVAL_XPOS: Lazy<Box<[bool]>> = Lazy::new(|| {
+    let mut v = vec![false; 262144];
+    gen_leval_xpos(&mut v);
+    v.into_boxed_slice()
+});
+pub static LEVAL_OPOS: Lazy<Box<[bool]>> = Lazy::new(|| {
+    let mut v = vec![false; 262144];
+    gen_leval_opos(&mut v);
+    v.into_boxed_slice()
+});
 
 
-pub struct Vale {
+pub struct Engine {
     board:    Board,
 
     /* Search trackers */
@@ -33,7 +46,7 @@ pub struct Vale {
 
 }
 
-impl Vale {
+impl Engine {
     pub fn init() -> Self {
         let board = Board::default();
         
@@ -89,92 +102,110 @@ impl Vale {
     pub fn search(&mut self) {
 
     }
-
-    // Before calling this function, search MUST determine if the game already ended!
-    // legals - legal moves, eval takes in account (heuristically) number of moves available, and returns better score in case it's more than threshold
-    pub fn eval(&mut self, legals: u128) -> i16 {
-        let mut score = 0;
-
-        // getting LOCAL_EVALS related + other stuff that needs loop over locals
-        let mut xpos: u16 = 0;
-        let mut opos: u16 = 0;
-        let mut scores = [0; 9];
-        for i in 0u8..9 {
-            let xs = (self.board.locals[0] & SUB_LOOKUP[i as usize]) >> i * 9;
-            let os = (self.board.locals[1] & SUB_LOOKUP[i as usize]) >> i * 9;
-            let lbs = xs as usize | (os << 9) as usize;
-            if LEVAL_XPOS[lbs] {
-                xpos.set_bit(i);
-            }
-            if LEVAL_OPOS[lbs] {
-                opos.set_bit(i);
-            }
-            scores[i as usize] = LEVAL_WEIGHTS[lbs];
-            // applying KEY/ANCHOR CELLS (pre-sort optimization mostly) scores
-            if self.board.global[i as usize] > 1 {
-                if xs.get_bit(i) != 0 {
-                    score += ANCHOR_WEIGHTS[i as usize];
-                } else if os.get_bit(i) != 0 {
-                    score -= ANCHOR_WEIGHTS[i as usize];
-                }
-            }
-        }
-
-        // applying LOCAL_EVALS scores
-        let (mut x1, mut x2, mut o1, mut o2) = (0, 0, 0, 0);
-        for lookup in WIN_LOOKUP.iter() {
-            if xpos & lookup == *lookup {
-                let mut cnt: i16 = 0;
-                let mut bits = *lookup;
-                while bits != 0 {
-                    let bit = bits.pop_bit();
-                    cnt += max(0, scores[bit as usize] as i16);
-                }
-                if cnt > x1 {
-                    x2 = x1;
-                    x1 = cnt;
-                } else if cnt > x2 {
-                    x2 = cnt;
-                }
-            }
-            if opos & lookup == *lookup {
-                let mut cnt: i16 = 0;
-                let mut bits = *lookup;
-                while bits != 0 {
-                    let bit = bits.pop_bit();
-                    cnt += min(0, scores[bit as usize] as i16);
-                }
-                if cnt < o1 {
-                    o2 = o1;
-                    o1 = cnt;
-                } else if cnt < o2 {
-                    o2 = cnt;
-                }
-            }
-        }
-        score += x1 * 10 + x2 - o1 * 10 - o2;
-
-        // applying move count heuristic
-        if legals.count_ones() > 9 {
-            if self.board.turn {
-                score -= FREE_MOVE_FACT;
-            } else{
-                score += FREE_MOVE_FACT;
-            }
-        }
-
-        score
-    }
 }
 
+
+// Before calling this function, search MUST determine if the game already ended!
+// legals - legal moves, eval takes in account (heuristically) number of moves available, and returns better score in case it's more than threshold
+// it's made as a passable argument to avoid duplicate calculations
+pub fn eval(board: &Board, legals: &u128) -> i16 {
+    let mut score = 0;
+
+    // getting LOCAL_EVALS related + other stuff that needs loop over locals
+    let mut xpos: u16 = 0;
+    let mut opos: u16 = 0;
+    let mut scores = [0; 9];
+    for i in 0u8..9 {
+        // it duplicates some lazy operations but it actually helps the bottleneck
+        if board.global[0].get_bit(i) != 0 {
+            xpos.set_bit(i);
+            scores[i as usize] = 30;  // LEVAL_WEIGHTS[lbs];
+            continue;
+        }
+        if board.global[1].get_bit(i) != 0 {
+            opos.set_bit(i);
+            scores[i as usize] = -30;  // LEVAL_WEIGHTS[lbs];
+            continue;
+        }
+        // don't check for global[2] (draw), because the real draw happens when there's no xpos and no opos
+        let xs = (board.locals[0] & SUB_LOOKUP[i as usize]) >> i * 9;
+        let os = (board.locals[1] & SUB_LOOKUP[i as usize]) >> i * 9;
+        let lbs = xs as usize | (os << 9) as usize;
+        let mut draw_flg = true;
+        if LEVAL_XPOS[lbs] {
+            xpos.set_bit(i);
+            draw_flg = false;
+        }
+        if LEVAL_OPOS[lbs] {
+            opos.set_bit(i);
+            draw_flg = false;
+        }
+        // real draw check (may be avoided because LEVAL_WEIGHTS[lbs] returns 0, BUT needed if there are also other checks later)
+        if draw_flg {
+            continue;
+        }
+        scores[i as usize] = LEVAL_WEIGHTS[lbs];
+        // applying KEY/ANCHOR CELLS (pre-sort optimization mostly) scores
+        // note that local board is overridden if it's won
+        if xs.get_bit(i) != 0 {  // && board.global[0].get_bit(i) == 0 {
+            score += ANCHOR_WEIGHTS[i as usize];
+        } else if os.get_bit(i) != 0 {  // && board.global[1].get_bit(i) == 0 {
+            score -= ANCHOR_WEIGHTS[i as usize];
+        }
+    }
+
+    // applying LOCAL_EVALS scores
+    let (mut x1, mut x2, mut o1, mut o2) = (0, 0, 0, 0);
+    for lookup in WIN_LOOKUP.iter() {
+        if xpos & lookup == *lookup {
+            let mut cnt: i16 = 0;
+            let mut bits = *lookup;
+            while bits != 0 {
+                let bit = bits.pop_bit();
+                cnt += max(0, scores[bit as usize] as i16);
+            }
+            if cnt > x1 {
+                x2 = x1;
+                x1 = cnt;
+            } else if cnt > x2 {
+                x2 = cnt;
+            }
+        }
+        if opos & lookup == *lookup {
+            let mut cnt: i16 = 0;
+            let mut bits = *lookup;
+            while bits != 0 {
+                let bit = bits.pop_bit();
+                cnt += min(0, scores[bit as usize] as i16);
+            }
+            if cnt < o1 {
+                o2 = o1;
+                o1 = cnt;
+            } else if cnt < o2 {
+                o2 = cnt;
+            }
+        }
+    }
+    score += x1 * 10 + x2 - o1 * 10 - o2;
+
+    // applying move count heuristic
+    if legals.count_ones() > 9 {
+        if board.turn {
+            score -= FREE_MOVE_FACT;
+        } else{
+            score += FREE_MOVE_FACT;
+        }
+    }
+
+    score
+}
 
 // the point of this function is to get and save relative score (+ for X, - for O) on a local board for further calculations
 // it does not account if it's possible to improve (from 0) score at all, so we have to use the following functions as well
 // note: the initial idea was to have x_score and o_score split, so this is an experiment
-fn gen_leval_weights() -> [i8; 262144] {
+fn gen_leval_weights(results: &mut [i8]) {
     const ERR: i8 = 0;
     const MX: i8 = 30;
-    let mut results: [i8; 262144] = [0; 262144];
     for index in 0..262144 {
         let bbx = (index & 0b111111111) as u16;
         let bbo = ((index >> 9) & 0b111111111) as u16;
@@ -234,13 +265,11 @@ fn gen_leval_weights() -> [i8; 262144] {
         }
         results[index] = x1 as i8 * 10 + x2 as i8 - o1 as i8 * 10 - o2 as i8;
     }
-    results
 }
 
 // this returns true for cases when we can improve our position on a local board for X
 // if it's false, then X cannot ever win this local board
-fn gen_leval_xpos() -> [bool; 262144] {
-    let mut results: [bool; 262144] = [false; 262144];
+fn gen_leval_xpos(results: &mut [bool]) {
     for index in 0..262144 {
         let bbx = (index & 0b111111111) as u16;
         let bbo = ((index >> 9) & 0b111111111) as u16;
@@ -257,13 +286,11 @@ fn gen_leval_xpos() -> [bool; 262144] {
             }
         }
     }
-    results
 }
 
 // this returns true for cases when we can improve our position on a local board for O
 // if it's false, then O cannot ever win this local board
-fn gen_leval_opos() -> [bool; 262144] {
-    let mut results: [bool; 262144] = [false; 262144];
+fn gen_leval_opos(results: &mut [bool]) {
     for index in 0..262144 {
         let bbx = (index & 0b111111111) as u16;
         let bbo = ((index >> 9) & 0b111111111) as u16;
@@ -280,5 +307,4 @@ fn gen_leval_opos() -> [bool; 262144] {
             }
         }
     }
-    results
 }

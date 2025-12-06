@@ -1,6 +1,27 @@
 use std::io::stdin;
-use crate::{bitboard::GetBit, board::Board, lookups::DIV_LOOKUP};
+use crate::{bitboard::GetBit, board::Board, engine::eval, lookups::DIV_LOOKUP};
 
+
+pub fn user_box() {
+    let mut board = Board::default();
+    while board.status > 2 {
+        // print current status
+        print_board(&board);
+        let legals = board.generate_legal_moves();
+        println!("movegen string: {}", format!("{:81b}", legals));
+        println!("zero-depth eval score: {}", format_eval(eval(&board, &legals)));
+
+        // return;
+
+        // ask for user input
+        // let mut input_line = String::new();
+        // stdin().read_line(&mut input_line).expect("Failed to read a line");
+        // input_line.trim().split_whitespace().next().map(|s| s.to_string());
+
+        let mov = user_input_move(legals);
+        board.make_move(mov);
+    }
+}
 
 pub fn print_board(board: &Board) {
     let legals = board.generate_legal_moves();
@@ -83,4 +104,15 @@ pub fn user_input_move(legals: u128) -> u8 {
 #[inline]
 fn grb(rank: u8, file: u8) -> u8 {
     (rank / 3) * 27 + (rank % 3) * 3 + (file / 3) * 9 + (file % 3)
+}
+
+fn format_eval(eval: i16) -> String {
+    if eval == 0 {
+        return "0".to_string();
+    }
+    let sign = if eval > 0 {"+"} else {"-"};
+    let abs = eval.abs();
+    let fpart = abs / 100;
+    let spart = abs % 100;
+    format!("{}{}.{:02}", sign, fpart, spart)
 }

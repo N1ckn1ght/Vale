@@ -5,22 +5,19 @@ mod engine;
 mod interface;
 
 use std::time::Instant;
-use crate::{board::Board, interface::{user_input_move, print_board}};
+use crate::{board::Board, interface::user_box};
 
 
 fn main() {
-    inter();
-}
+    println!("Hello, world!");
+    let _ = &*engine::LEVAL_WEIGHTS;
+    let _ = &*engine::LEVAL_XPOS;
+    let _ = &*engine::LEVAL_OPOS;
+    println!("Force init completed.");
 
-fn inter() {
-    let mut board = Board::default();
-    while board.status > 2 {
-        print_board(&board);
-        let legals = board.generate_legal_moves();
-        println!("{}", format!("{:0128b}", legals));
-        let mov = user_input_move(legals);
-        board.make_move(mov);
-    }
+
+    user_box();
+    // perft(8);
 }
 
 fn perft(x: u8) {
