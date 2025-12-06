@@ -4,6 +4,7 @@ pub const LF: u128 = 0b111111111111111111111111111111111111111111111111111111111
 pub const LS: u128 = 0b111111111;
 pub const SF: u16  = 0b111111111;
 
+
 pub trait DelBit<T> {
     fn del_bit(&mut self, bit: u8);
 }

@@ -1,20 +1,36 @@
-mod frame;
+mod bitboard;
+mod lookups;
+mod board;
 mod engine;
+mod interface;
 
 use std::time::Instant;
-use frame::field::Field;
+use crate::{board::Board, interface::{user_input_move, print_board}};
+
 
 fn main() {
-    perft(8);
+    inter();
+    // perft(8);
+}
+
+fn inter() {
+    let mut board = Board::default();
+    while board.status > 2 {
+        print_board(&board);
+        let legals = board.generate_legal_moves();
+        println!("{}", format!("{:0128b}", legals));
+        let mov = user_input_move(legals);
+        board.make_move(mov);
+    }
 }
 
 fn perft(x: u8) {
-    let mut fd = Field::default();
+    let mut board = Board::default();
 
     let timer = Instant::now();
     let mut mvc: u64 = 0;
     for i in 1..=x {
-        let cmvc = fd.perft(i);
+        let cmvc = board.perft(i);
         println!("depth = {}, legal moves counted = {}", i, cmvc);
         mvc += cmvc;
     }

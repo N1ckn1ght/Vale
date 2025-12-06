@@ -1,17 +1,18 @@
 use super::{bitboard::*, lookups::*};
 
+
 #[derive(Debug, Clone)]
-pub struct Field {
+pub struct Board {
     pub global:   [u16; 3],   // 0b111111111 - board of finished boards, 3rd board means it's draw (9 bits used)
     pub locals:   [u128; 2],  // sub-boards, little-endian, 0 for X, 1 for O (81 bits used)
     pub status:   u8,         // 0 - X won, 1 - O won, 2 - Draw, 3 - Game still on (could be enum, but "status = turn as usize" is used)\
     pub turn:     bool,       // is current move for O?
-    pub history:  Vec<u128>,  // field backups: locals[previous_turn] | (mov << 96)
+    pub history:  Vec<u128>,  // board backups: locals[previous_turn] | (mov << 96)
                               //     null moves are not included, use null_move() method to change the turn
 }
 
-impl Default for Field {
-    // generate an emtpy and ready to play field
+impl Default for Board {
+    // generate empty and ready to play board
     fn default() -> Self {
         Self {
             global: [0; 3],
@@ -23,7 +24,7 @@ impl Default for Field {
     }
 }
 
-impl Field {
+impl Board {
     pub fn import(&mut self, ken: &str) {
         self.global = [0; 3];
         self.locals = [0; 2];
@@ -104,9 +105,9 @@ impl Field {
     }
 
     pub fn init(ken: &str) -> Self {
-        let mut fd = Field::default();
-        fd.import(ken);
-        fd
+        let mut board = Board::default();
+        board.import(ken);
+        board
     }
 
     pub fn generate_legal_moves(&self) -> u128 {
@@ -216,7 +217,7 @@ impl Field {
     }
 }
 
-impl PartialEq for Field {
+impl PartialEq for Board {
     // fast and not precise for debug
     fn eq(&self, other: &Self) -> bool {
         self.locals[0] == other.locals[0] &&
@@ -230,92 +231,92 @@ mod tests {
     use super::*;
 
     #[test]
-    fn field_make_move() {
-        let mut field1 = Field::default();
-        let field2 = Field::default();
+    fn board_make_move() {
+        let mut board1 = Board::default();
+        let board2 = Board::default();
 
-        field1.make_move(0);
-        field1.undo_move();
-        field1.make_move(80);
-        field1.undo_move();
+        board1.make_move(0);
+        board1.undo_move();
+        board1.make_move(80);
+        board1.undo_move();
 
-        assert_eq!(field1.locals[0], field2.locals[0]);
-        assert_eq!(field1.locals[1], field2.locals[1]);
+        assert_eq!(board1.locals[0], board2.locals[0]);
+        assert_eq!(board1.locals[1], board2.locals[1]);
 
-        field1.make_move(0);
-        field1.make_move(1);
-        field1.undo_move();
-        field1.undo_move();
+        board1.make_move(0);
+        board1.make_move(1);
+        board1.undo_move();
+        board1.undo_move();
 
-        assert_eq!(field1.locals[0], field2.locals[0]);
-        assert_eq!(field1.locals[1], field2.locals[1]);
+        assert_eq!(board1.locals[0], board2.locals[0]);
+        assert_eq!(board1.locals[1], board2.locals[1]);
     }
 
     #[test]
-    fn field_move_generation() {
-        let mut fd = Field::default();
+    fn board_move_generation() {
+        let mut board = Board::default();
 
-        fd.make_move(0);
-        assert_eq!(fd.locals[0], 1);
-        assert_eq!(fd.locals[1], 0);
-        assert_eq!(fd.generate_legal_moves(), 0b111111110);
+        board.make_move(0);
+        assert_eq!(board.locals[0], 1);
+        assert_eq!(board.locals[1], 0);
+        assert_eq!(board.generate_legal_moves(), 0b111111110);
 
-        fd.make_move(1);
-        assert_eq!(fd.locals[0], 1);
-        assert_eq!(fd.locals[1], 0b10);
-        assert_eq!(fd.generate_legal_moves(), 0b111111111000000000);
-        fd.undo_move();
-        fd.undo_move();
+        board.make_move(1);
+        assert_eq!(board.locals[0], 1);
+        assert_eq!(board.locals[1], 0b10);
+        assert_eq!(board.generate_legal_moves(), 0b111111111000000000);
+        board.undo_move();
+        board.undo_move();
 
-        assert_eq!(fd.perft(1), 81);
-        assert_eq!(fd.perft(2), 720);
-        assert_eq!(fd.perft(3), 6336);
-    }
-
-    /* NOT VERIFIED ! */
-    #[test]
-    fn field_move_generation_perft6() {
-        let mut fd = Field::default();
-
-        assert_eq!(fd.perft(4), 55080);
-        assert_eq!(fd.perft(5), 473256);
-        assert_eq!(fd.perft(6), 4017888);
+        assert_eq!(board.perft(1), 81);
+        assert_eq!(board.perft(2), 720);
+        assert_eq!(board.perft(3), 6336);
     }
 
     /* NOT VERIFIED ! */
     #[test]
-    fn field_move_generation_perft7() {
-        let mut fd = Field::default();
+    fn board_move_generation_perft6() {
+        let mut board = Board::default();
 
-        assert_eq!(fd.perft(7), 33702480);
+        assert_eq!(board.perft(4), 55080);
+        assert_eq!(board.perft(5), 473256);
+        assert_eq!(board.perft(6), 4017888);
+    }
+
+    /* NOT VERIFIED ! */
+    #[test]
+    fn board_move_generation_perft7() {
+        let mut board = Board::default();
+
+        assert_eq!(board.perft(7), 33702480);
     }
 
     #[test]
-    fn field_import() {
-        let mut fd1 = Field::default();
-        fd1.make_move(0);
-        fd1.make_move(1);
-        let mut fd2 = Field::default();
-        fd2.import("9-9-9-9-9-9-9-9-7ox");
-        assert_eq!(fd1, fd2);
+    fn board_import() {
+        let mut board1 = Board::default();
+        board1.make_move(0);
+        board1.make_move(1);
+        let mut board2 = Board::default();
+        board2.import("9-9-9-9-9-9-9-9-7ox");
+        assert_eq!(board1, board2);
 
-        let fd = Field::init("9-9-9-9-o3x4-9-9-9-9");
-        assert_eq!(fd.locals[0], 0b000000000000000000000000000000000000000010000000000000000000000000000000000000000);
-        assert_eq!(fd.locals[1], 0b000000000000000000000000000000000000100000000000000000000000000000000000000000000);
-        assert_eq!(fd.global, [0, 0, 0]);
-        assert_eq!(fd.status, 3);
-        assert_eq!(fd.turn, false);
+        let board = Board::init("9-9-9-9-o3x4-9-9-9-9");
+        assert_eq!(board.locals[0], 0b000000000000000000000000000000000000000010000000000000000000000000000000000000000);
+        assert_eq!(board.locals[1], 0b000000000000000000000000000000000000100000000000000000000000000000000000000000000);
+        assert_eq!(board.global, [0, 0, 0]);
+        assert_eq!(board.status, 3);
+        assert_eq!(board.turn, false);
 
-        let fd = Field::init("2x2x2x-o3o3o-9-9-4ox3-9-9-9-xxoooxxox");
-        assert_eq!(fd.locals[0], 0b001001001000000000000000000000000000000001000000000000000000000000000000110001101);
-        assert_eq!(fd.locals[1], 0b000000000100010001000000000000000000000010000000000000000000000000000000001110010);
-        assert_eq!(fd.global, [0b100000000, 0b010000000, 0b000000001]);
-        assert_eq!(fd.status, 3);
-        assert_eq!(fd.turn, true);
+        let board = Board::init("2x2x2x-o3o3o-9-9-4ox3-9-9-9-xxoooxxox");
+        assert_eq!(board.locals[0], 0b001001001000000000000000000000000000000001000000000000000000000000000000110001101);
+        assert_eq!(board.locals[1], 0b000000000100010001000000000000000000000010000000000000000000000000000000001110010);
+        assert_eq!(board.global, [0b100000000, 0b010000000, 0b000000001]);
+        assert_eq!(board.status, 3);
+        assert_eq!(board.turn, true);
 
-        let fd = Field::init("2x2x2x-o3o3o-3ooo3-1x2x2x1-x3x3x-ooo6-6ooo-x2x2x2-xoxooxxxo");
-        assert_eq!(fd.global, [0b100110010, 0b011001100, 0b000000001]);
-        assert_eq!(fd.status, 2);
-        assert_eq!(fd.turn, true);
+        let board = Board::init("2x2x2x-o3o3o-3ooo3-1x2x2x1-x3x3x-ooo6-6ooo-x2x2x2-xoxooxxxo");
+        assert_eq!(board.global, [0b100110010, 0b011001100, 0b000000001]);
+        assert_eq!(board.status, 2);
+        assert_eq!(board.turn, true);
     }
 }
