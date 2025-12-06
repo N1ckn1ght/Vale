@@ -10,7 +10,6 @@ use crate::{board::Board, interface::{user_input_move, print_board}};
 
 fn main() {
     inter();
-    // perft(8);
 }
 
 fn inter() {

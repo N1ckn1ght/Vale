@@ -157,6 +157,9 @@ impl Board {
 
         if win_occured {
             let mut global_win_occured = false;
+
+            // I guess if you wanna REAL values of local boards, keep them on the interface level?
+            self.locals[my_turn] |= SUB_LOOKUP[gbit as usize];
             
             if self.global[my_turn].count_ones() > 2 {
                 for mask in WIN_LOOKUP_INDEXED.iter().skip(WIN_LOOKUP_INDICES[gbit as usize][0]).take(WIN_LOOKUP_INDICES[gbit as usize][1]) {
@@ -268,27 +271,33 @@ mod tests {
         board.undo_move();
         board.undo_move();
 
+        board.make_move(40);
+        board.make_move(42);
+        board.make_move(58);
+        board.make_move(43);
+        board.make_move(67);
+        board.make_move(44);
+        board.make_move(76);
+        assert_eq!(board.generate_legal_moves(), 0b111101111111101111111101111111111111000000000111111111111111111111111111111111111);
+    }
+
+    #[test]
+    fn board_move_generation_perft_pre_local_wins() {
+        let mut board = Board::default();
         assert_eq!(board.perft(1), 81);
         assert_eq!(board.perft(2), 720);
         assert_eq!(board.perft(3), 6336);
-    }
-
-    /* NOT VERIFIED ! */
-    #[test]
-    fn board_move_generation_perft6() {
-        let mut board = Board::default();
-
         assert_eq!(board.perft(4), 55080);
         assert_eq!(board.perft(5), 473256);
-        assert_eq!(board.perft(6), 4017888);
     }
 
     /* NOT VERIFIED ! */
     #[test]
-    fn board_move_generation_perft7() {
+    fn board_move_generation_perft_past_local_wins() {
         let mut board = Board::default();
-
-        assert_eq!(board.perft(7), 33702480);
+        assert_eq!(board.perft(6), 4020960);
+        assert_eq!(board.perft(7), 33782544);
+        // assert_eq!(board.perft(8), 281067408);
     }
 
     #[test]
