@@ -1,6 +1,7 @@
 use super::{bitboard::*, lookups::*};
 
-pub const MOV_CAP: usize = 81;  // lwbits takes MOV_CAP + 1
+pub const MOV_CAP: usize = 82;
+pub const ERR_MOV: u8 = 128;
 
 
 pub struct Board {
@@ -28,15 +29,12 @@ impl Default for Board {
 }
 
 impl Board {
-    pub fn import(&mut self, ken: &str) {
-        self.global = [0; 3];
-        self.locals = [0; 2];
-        self.status = 3;
-        self.turn = false;
-        self.history = Vec::with_capacity(MOV_CAP);
-        self.lwbits = 0;
-
-        let parts = ken.split('-');
+    pub fn import_ken(&mut self, ken: &str) {
+        self.clear();
+        let mut iter = ken.split(" ");
+        let sup1 = iter.next().unwrap_or("9-9-9-9-9-9-9-9-9");
+        let sup2 = iter.next().unwrap_or("-");
+        let parts = sup1.split('-');
         let mut bit = 81;
         for part in parts.into_iter() {
             for char in part.chars() {
@@ -108,12 +106,55 @@ impl Board {
         if self.status > 1 && self.global[0] | self.global[1] | self.global[2] == SF {
             self.status = 2;
         }
+
+        if sup2 != "-" {
+            let last_mov = transform_move(&sup2, !0); 
+            if last_mov != ERR_MOV {
+                let mut prev = self.locals[!self.turn as usize];
+                prev.del_bit(last_mov);
+                self.history.push(prev | ((last_mov as u128) << 96));
+            }
+        }
     }
 
-    pub fn init(ken: &str) -> Self {
-        let mut board = Board::default();
-        board.import(ken);
-        board
+    pub fn import_history(&mut self, moves: &str) {
+        self.clear();
+        let parts = moves.split(' ');
+        let mut hist = String::new();
+        for part in parts.into_iter() {
+            let mov = transform_move(part, self.generate_legal_moves());
+            if mov == ERR_MOV {
+                println!("#DEBUG Illegal move: {}\n#DEBUG Applied sequence: {}", part, hist);
+                break;
+            }
+            hist += part;
+            hist += " ";
+            self.make_move(mov);
+        }
+    }
+
+    pub fn export_ken(&self) -> String {
+        
+    }
+
+    pub fn export_history(&self) -> String {
+        let history = String::new();
+        let mut xlocal = 0;
+        let mut olocal = 0;
+        let mut turn = false;
+        for local in self.history.iter() {
+            
+        }
+        
+    }
+
+    pub fn clear(&mut self) {
+        self.global = [0; 3];
+        self.locals = [0; 2];
+        self.status = 3;
+        self.turn = false;
+        self.history = Vec::with_capacity(MOV_CAP);
+        self.lwbits = 0;
     }
 
     pub fn generate_legal_moves(&self) -> u128 {
@@ -227,6 +268,33 @@ impl Board {
     }
 }
 
+pub fn transform_move(user_mov: &str, legals: u128) -> u8 {
+    let chars = user_mov.trim().chars();
+    if chars.count() != 2 {
+        println!("#DEBUG Wrong user input: must be from a1 to i9 (expected 2 chars)");
+        return ERR_MOV;
+    }
+    let mut chars = user_mov.trim().chars();
+    let file = chars.next().unwrap().to_ascii_lowercase();
+    let rank = chars.next().unwrap();
+    if !(('a'..='i').contains(&file) && ('1'..='9').contains(&rank)) {
+        println!("#DEBUG Wrong user input: must be from a1 to i9");
+        return ERR_MOV;
+    }
+    let realbit = grb((rank as u32 - '1' as u32) as u8, (file as u32 - 'a' as u32) as u8);
+    if legals.get_bit(realbit) == 0 {
+        println!("#DEBUG Wrong user input: illegal move");
+        return ERR_MOV;
+    }
+    return realbit;
+}
+
+#[inline]
+pub fn grb(rank: u8, file: u8) -> u8 {
+    (rank / 3) * 27 + (rank % 3) * 3 + (file / 3) * 9 + (file % 3)
+}
+
+
 
 #[cfg(test)]
 mod tests {
@@ -304,29 +372,39 @@ mod tests {
     }
 
     #[test]
-    fn board_import() {
+    fn board_imports() {
         let mut board1 = Board::default();
         board1.make_move(0);
         board1.make_move(1);
         let mut board2 = Board::default();
-        board2.import("9-9-9-9-9-9-9-9-7ox");
-        // assert_eq!(board1, board2);
+        board2.import_ken("9-9-9-9-9-9-9-9-7ox b1");
+        assert_eq!(board1.generate_legal_moves(), board2.generate_legal_moves());
+        assert_eq!(board1.locals[0], board2.locals[0]);
+        assert_eq!(board1.locals[1], board2.locals[1]);
+        assert_eq!(board1.lwbits, board2.lwbits);
 
-        let board = Board::init("9-9-9-9-o3x4-9-9-9-9");
+        board1.clear();
+        board1.import_history("e5 d6 b8 e6 e8 f6 h8");
+        assert_eq!(board1.generate_legal_moves(), 0b111101111111101111111101111111111111000000000111111111111111111111111111111111111);
+
+        /* old tests, disincluding last move made */
+
+        let mut board = Board::default();
+        board.import_ken("9-9-9-9-o3x4-9-9-9-9");
         assert_eq!(board.locals[0], 0b000000000000000000000000000000000000000010000000000000000000000000000000000000000);
         assert_eq!(board.locals[1], 0b000000000000000000000000000000000000100000000000000000000000000000000000000000000);
         assert_eq!(board.global, [0, 0, 0]);
         assert_eq!(board.status, 3);
         assert_eq!(board.turn, false);
 
-        let board = Board::init("2x2x2x-o3o3o-9-9-4ox3-9-9-9-xxoooxxox");
+        board.import_ken("2x2x2x-o3o3o-9-9-4ox3-9-9-9-xxoooxxox");
         assert_eq!(board.locals[0], 0b001001001000000000000000000000000000000001000000000000000000000000000000110001101);
         assert_eq!(board.locals[1], 0b000000000100010001000000000000000000000010000000000000000000000000000000001110010);
         assert_eq!(board.global, [0b100000000, 0b010000000, 0b000000001]);
         assert_eq!(board.status, 3);
         assert_eq!(board.turn, true);
 
-        let board = Board::init("2x2x2x-o3o3o-3ooo3-1x2x2x1-x3x3x-ooo6-6ooo-x2x2x2-xoxooxxxo");
+        board.import_ken("2x2x2x-o3o3o-3ooo3-1x2x2x1-x3x3x-ooo6-6ooo-x2x2x2-xoxooxxxo");
         assert_eq!(board.global, [0b100110010, 0b011001100, 0b000000001]);
         assert_eq!(board.status, 2);
         assert_eq!(board.turn, true);

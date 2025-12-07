@@ -4,6 +4,9 @@ use crate::{bitboard::GetBit, board::Board, engine::eval, lookups::DIV_LOOKUP};
 
 pub fn user_box() {
     let mut board = Board::default();
+    // board.import_history("e5 d6 b8 e6 e8 f6 h8");
+    // let mut board = Board::init("9-9-9-9-9-9-9-9-9 -");
+    // board.import("9-9-9-9-9-9-9-9-7ox b1");
     while board.status > 2 {
         // print current status
         print_board(&board);

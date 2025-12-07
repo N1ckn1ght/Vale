@@ -4,7 +4,8 @@ mod board;
 mod engine;
 mod interface;
 
-use std::time::Instant;
+use core::time;
+use std::{thread::sleep, time::Instant};
 use crate::{board::Board, interface::user_box};
 
 
@@ -15,9 +16,9 @@ fn main() {
     let _ = &*engine::LEVAL_OPOS;
     println!("Force init completed.");
 
-
-    // user_box();
     perft(8);
+    // println!("(results are a bit skewed because of user_box right after perft idk)\n");
+    // user_box();
 }
 
 fn perft(x: u8) {
