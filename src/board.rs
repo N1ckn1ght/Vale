@@ -10,23 +10,19 @@ pub struct Board {
     pub turn:     bool,       // is current move for O?
     pub history:  Vec<u128>,  // board backups: locals[previous_turn] | (mov << 96)
                               //     null moves are not included, use null_move() method to change the turn
-    pub lwbits:   Vec<u128>   // local win board bits, to apply mask to generate legal moves fast when it's free board move
-                              //     there are better solutions in terms of performance, but we need this to store REAL local boards values in locals
-                              //     saved as history in order to backtrack properly, use "top of the stack" as current lwbits
+    pub lwbits:   u128        // local win board bits, to apply mask to generate legal moves fast when it's free board move
 }
 
 impl Default for Board {
     // generate empty and ready to play board
     fn default() -> Self {
-        let mut lwbits = Vec::with_capacity(MOV_CAP + 1);
-        lwbits.push(0);
         Self {
             global: [0; 3],
             locals: [0; 2],
             status: 3,
             turn: false,
             history: Vec::with_capacity(MOV_CAP),
-            lwbits
+            lwbits: 0
         }
     }
 }
@@ -38,8 +34,7 @@ impl Board {
         self.status = 3;
         self.turn = false;
         self.history = Vec::with_capacity(MOV_CAP);
-        self.lwbits = Vec::with_capacity(MOV_CAP + 1);
-        self.lwbits.push(0);
+        self.lwbits = 0;
 
         let parts = ken.split('-');
         let mut bit = 81;
@@ -77,7 +72,7 @@ impl Board {
             }
 
             if win_occured {
-                *self.lwbits.last_mut().unwrap() |= SUB_LOOKUP[i as usize];
+                self.lwbits |= SUB_LOOKUP[i as usize];
                 continue;
             }
 
@@ -92,7 +87,7 @@ impl Board {
             }
 
             if win_occured {
-                *self.lwbits.last_mut().unwrap() |= SUB_LOOKUP[i as usize];
+                self.lwbits |= SUB_LOOKUP[i as usize];
                 continue;
             }
 
@@ -126,7 +121,7 @@ impl Board {
             return 0;
         }
     
-        let free = !self.locals[0] & !self.locals[1] & LF & !self.lwbits.last().unwrap();
+        let free = !self.locals[0] & !self.locals[1] & LF & !self.lwbits;
 
         if self.history.is_empty() {
             return free;
@@ -169,11 +164,7 @@ impl Board {
         if win_occured {
             let mut global_win_occured = false;
 
-            // I guess if you wanna REAL values of local boards, keep them on the interface level?
-            // self.locals[my_turn] |= SUB_LOOKUP[gbit as usize];
-            // ^ hack removed, sadly speed is gone too
-
-            self.lwbits.push(self.lwbits.last().unwrap() | SUB_LOOKUP[gbit as usize]);
+            self.lwbits |= SUB_LOOKUP[gbit as usize];
 
             if self.global[my_turn].count_ones() > 2 {
                 for mask in WIN_LOOKUP_INDEXED.iter().skip(WIN_LOOKUP_INDICES[gbit as usize][0]).take(WIN_LOOKUP_INDICES[gbit as usize][1]) {
@@ -196,7 +187,6 @@ impl Board {
             if (my_overlap | op_overlap) & SUB_LOOKUP[gbit as usize] == SUB_LOOKUP[gbit as usize] {
                 self.global[2].set_bit(gbit);
             }
-            self.lwbits.push(*self.lwbits.last().unwrap());
         }
 
         self.turn = !self.turn;
@@ -210,10 +200,11 @@ impl Board {
         self.turn = !self.turn;
         self.locals[self.turn as usize] = self.history.last().unwrap() & LF;
         let mov = (self.history.pop().unwrap() >> 96) as usize;
-        self.global[self.turn as usize].del_bit(DIV_LOOKUP[mov]);
-        self.global[2].del_bit(DIV_LOOKUP[mov]);
+        let dl = DIV_LOOKUP[mov];
+        self.global[self.turn as usize].del_bit(dl);
+        self.global[2].del_bit(dl);
         self.status = 3;
-        self.lwbits.pop();
+        self.lwbits &= !SUB_LOOKUP[dl as usize];
     }
 
     /* Debug and benchmarking */
