@@ -3,7 +3,7 @@ use once_cell::sync::Lazy;
 use crate::{bitboard::{GetBit, PopBit, SetBit}, board::Board, lookups::{SUB_LOOKUP, WIN_LOOKUP}};
 
 // search aux
-const PLY_LIMIT: usize = 96;   // 81
+const PLY_LIMIT: usize = 81;
 const INF: i16 = 16384;
 
 // eval weights

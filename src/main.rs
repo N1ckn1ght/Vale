@@ -16,8 +16,8 @@ fn main() {
     println!("Force init completed.");
 
 
-    user_box();
-    // perft(8);
+    // user_box();
+    perft(8);
 }
 
 fn perft(x: u8) {
