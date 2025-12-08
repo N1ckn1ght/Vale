@@ -124,6 +124,8 @@ impl Board {
         if sup2 != "-" {
             let last_mov = transform_move(&sup2, !0); 
             if last_mov != ERR_MOV {
+                self.moves.push(last_mov);
+                // unused?
                 let mut prev = self.locals[!self.turn as usize];
                 prev.del_bit(last_mov);
                 self.history.push(prev | ((last_mov as u128) << 96));
@@ -151,24 +153,35 @@ impl Board {
         
     // }
 
-    // pub fn export_history(&self) -> String {
-    //     let mut history = String::new();
-    //     let mut xlocal = 0;
-    //     let mut olocal = 0;
-    //     let mut turn = false;
-    //     for local in self.history.iter().skip(2) {
-    //         if turn {
-
-    //         } else {
-    //             let diff = (xlocal & local).pop_bit();
-    //             // history += transform_move(diff, !0);
-    //         }
-    //         turn = !turn;
-    //     }
-
-
-    //     // history
-    // }
+    pub fn export_history(&self, format: u8) -> String {
+        /* format 0 - string of moves with no dividers
+           format 1 - pgn-like format
+           format 2 - pgn-like format separated by \n every full move */
+        if self.moves.is_empty() {
+            println!("#DEBUG No moves were made.");
+            "".to_string();
+        }
+        if self.history[0] != 0 {
+            println!("#DEBUG Cannot export REAL move history: game was imported by ken, no initial move history available!");
+        }
+        let mut history = String::new();
+        let mut cnt: u16 = 2;
+        for mov in self.moves.iter() {
+            if format != 0 && cnt.get_bit(0) == 0 {
+                history += &format!("{}. ", cnt / 2);
+            }
+            // todo
+            history += &transform_move_back(*mov);
+            if format == 2 && cnt.get_bit(0) != 0 {
+                history += "\n";
+            } else {
+                history += " ";
+            }
+            cnt += 1;
+        }
+        history.pop();
+        history
+    }
 
     pub fn generate_legal_moves(&self) -> u128 {
         if self.status < 3 {

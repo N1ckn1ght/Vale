@@ -16,9 +16,9 @@ fn main() {
     let _ = &*engine::LEVAL_OPOS;
     println!("Force init completed.");
 
-    perft(8);
+    // perft(8);
     // println!("(results are a bit skewed because of user_box right after perft idk)\n");
-    // user_box();
+    user_box();
 }
 
 fn perft(x: u8) {

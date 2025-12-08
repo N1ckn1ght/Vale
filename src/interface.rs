@@ -24,6 +24,12 @@ pub fn user_box() {
         let mov = user_input_move(legals);
         println!("move index accepted: {}", mov);
         board.make_move(mov);
+        // println!("mov history test 0");
+        // println!("{}", board.export_history(0));
+        // println!("mov history test 1");
+        // println!("{}", board.export_history(1));
+        // println!("mov history test 2");
+        // println!("{}", board.export_history(2));
     }
 }
 
