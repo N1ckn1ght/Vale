@@ -5,13 +5,16 @@ pub const ERR_MOV: u8 = 128;
 
 
 pub struct Board {
-    pub global:   [u16; 3],   // 0b111111111 - board of finished boards, 3rd board means it's draw (9 bits used)
-    pub locals:   [u128; 2],  // sub-boards, little-endian, 0 for X, 1 for O (81 bits used)
-    pub status:   u8,         // 0 - X won, 1 - O won, 2 - Draw, 3 - Game still on (could be enum, but "status = turn as usize" is used)\
-    pub turn:     bool,       // is current move for O?
-    pub history:  Vec<u128>,  // board backups: locals[previous_turn] | (mov << 96)
-                              //     null moves are not included, use null_move() method to change the turn
+    pub global:   [u16; 3],   // sub-boards completion (or The Global Board)
+                              // 0 - X won, 1 - O won, 2 - Draw on board (9 bits used)
+    pub locals:   [u128; 2],  // sub-boards, little-endian for subs (look at move transform methods)
+                              // 0 - X, 1 - O (81 bits used)
+    pub status:   u8,         // 0 - X won, 1 - O won, 2 - Draw, 3 - Game still on
+    pub turn:     bool,       // 0 - X to move, 1 - O to move
+    pub history:  Vec<u128>,  // board backups: locals[previous_turn]
+    pub moves:    Vec<u8>,    // complete move history
     pub lwbits:   u128        // local win board bits, to apply mask to generate legal moves fast when it's free board move
+                              // includes !LF mask in itself as a part of optimization
 }
 
 impl Default for Board {
@@ -23,12 +26,23 @@ impl Default for Board {
             status: 3,
             turn: false,
             history: Vec::with_capacity(MOV_CAP),
-            lwbits: 0
+            moves: Vec::with_capacity(MOV_CAP),
+            lwbits: !LF
         }
     }
 }
 
 impl Board {
+    pub fn clear(&mut self) {
+        self.global = [0; 3];
+        self.locals = [0; 2];
+        self.status = 3;
+        self.turn = false;
+        self.history = Vec::with_capacity(MOV_CAP);
+        self.moves = Vec::with_capacity(MOV_CAP);
+        self.lwbits = !LF;
+    }
+
     pub fn import_ken(&mut self, ken: &str) {
         self.clear();
         let mut iter = ken.split(" ");
@@ -133,56 +147,52 @@ impl Board {
         }
     }
 
-    pub fn export_ken(&self) -> String {
+    // pub fn export_ken(&self) -> String {
         
-    }
+    // }
 
-    pub fn export_history(&self) -> String {
-        let history = String::new();
-        let mut xlocal = 0;
-        let mut olocal = 0;
-        let mut turn = false;
-        for local in self.history.iter() {
-            
-        }
-        
-    }
+    // pub fn export_history(&self) -> String {
+    //     let mut history = String::new();
+    //     let mut xlocal = 0;
+    //     let mut olocal = 0;
+    //     let mut turn = false;
+    //     for local in self.history.iter().skip(2) {
+    //         if turn {
 
-    pub fn clear(&mut self) {
-        self.global = [0; 3];
-        self.locals = [0; 2];
-        self.status = 3;
-        self.turn = false;
-        self.history = Vec::with_capacity(MOV_CAP);
-        self.lwbits = 0;
-    }
+    //         } else {
+    //             let diff = (xlocal & local).pop_bit();
+    //             // history += transform_move(diff, !0);
+    //         }
+    //         turn = !turn;
+    //     }
+
+
+    //     // history
+    // }
 
     pub fn generate_legal_moves(&self) -> u128 {
         if self.status < 3 {
             return 0;
         }
-    
-        let free = !self.locals[0] & !self.locals[1] & LF & !self.lwbits;
 
-        if self.history.is_empty() {
+        let free = !(self.locals[0] | self.locals[1] | self.lwbits);
+
+        if self.moves.is_empty() {
             return free;
         }
-    
-        let last_mov = (self.history.last().unwrap() >> 96) as usize;
-        let overlap = free & SUB_LOOKUP[MOD_LOOKUP[last_mov] as usize];
-    
-        if overlap == 0 {
-            return free;
-        }
+        let overlap = free & SUB_LOOKUP[MOD_LOOKUP[*self.moves.last().unwrap() as usize] as usize];
 
-        overlap
+        if overlap != 0 {
+            return overlap;
+        }
+        free
     }
 
     pub fn make_move(&mut self, mov: u8) {
         let my_turn = self.turn as usize;
 
-        self.history.push(self.locals[my_turn] | ((mov as u128) << 96));
-
+        self.history.push(self.locals[my_turn]);
+        self.moves.push(mov);
         self.locals[my_turn].set_bit(mov);
 
         let gbit = DIV_LOOKUP[mov as usize];
@@ -233,15 +243,11 @@ impl Board {
         self.turn = !self.turn;
     }
 
-    pub fn null_move(&mut self) {
-        self.turn = !self.turn;
-    }
-
     pub fn undo_move(&mut self) {
         self.turn = !self.turn;
-        self.locals[self.turn as usize] = self.history.last().unwrap() & LF;
-        let mov = (self.history.pop().unwrap() >> 96) as usize;
-        let dl = DIV_LOOKUP[mov];
+        let mov = self.moves.pop().unwrap();
+        self.locals[self.turn as usize] = self.history.pop().unwrap();
+        let dl = DIV_LOOKUP[mov as usize];
         self.global[self.turn as usize].del_bit(dl);
         self.global[2].del_bit(dl);
         self.status = 3;
@@ -286,7 +292,20 @@ pub fn transform_move(user_mov: &str, legals: u128) -> u8 {
         println!("#DEBUG Wrong user input: illegal move");
         return ERR_MOV;
     }
-    return realbit;
+    realbit
+}
+
+pub fn transform_move_back(mov: u8) -> String {
+    if mov > 80 {
+        return "??".to_string();
+    }
+    let gdv = mov / 27;
+    let gmd = mov % 27;
+    let ldv = gmd / 9;
+    let lmd = gmd % 9;
+    let rank = gdv * 3 + lmd / 3;  // 0..8 -> '1'..'9'
+    let file = ldv * 3 + lmd % 3;  // 0..8 -> 'a'..'i'
+    format!("{}{}", (b'a' + file) as char, (b'1' + rank) as char)
 }
 
 #[inline]
@@ -299,6 +318,23 @@ pub fn grb(rank: u8, file: u8) -> u8 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn board_transform_move() {
+        assert_eq!(transform_move("a1", !0), 0);
+        assert_eq!(transform_move("b1", !0), 1);
+        assert_eq!(transform_move("a2", !0), 3);
+        assert_eq!(transform_move("g1", !0), 18);
+        assert_eq!(transform_move("c6", !0), 35);
+        assert_eq!(transform_move("i9", 1 << 80), 80);
+        assert_eq!(transform_move("i9", 0), ERR_MOV);
+        assert_eq!(transform_move_back(0), "a1");
+        assert_eq!(transform_move_back(1), "b1");
+        assert_eq!(transform_move_back(3), "a2");
+        assert_eq!(transform_move_back(18), "g1");
+        assert_eq!(transform_move_back(35), "c6");
+        assert_eq!(transform_move_back(80), "i9");
+    }
 
     #[test]
     fn board_make_move() {

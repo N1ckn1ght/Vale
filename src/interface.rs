@@ -22,6 +22,7 @@ pub fn user_box() {
         // input_line.trim().split_whitespace().next().map(|s| s.to_string());
 
         let mov = user_input_move(legals);
+        println!("move index accepted: {}", mov);
         board.make_move(mov);
     }
 }
