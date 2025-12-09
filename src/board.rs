@@ -201,7 +201,7 @@ impl Board {
             return "".to_string();
         }
         if self.history[0] != 0 {
-            println!("#DEBUG Cannot export REAL move history: game was imported by ken, no initial move history available!");
+            println!("#DEBUG Cannot export REAL move history: game was imported by KEN, no initial move history available!");
         }
         let mut history = String::new();
         let mut cnt: u16 = 2;

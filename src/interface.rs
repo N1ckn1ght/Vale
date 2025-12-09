@@ -7,8 +7,6 @@ pub fn user_box() {
 
     let mut hint_used = false;
     let mut show_movegen = false;
-    let mut show_eval: bool = false;
-    let mut depth_eval = 0;
     let mut show_bestline = false;
     let mut show_history = true;
     let mut show_ken = true;
@@ -16,10 +14,10 @@ pub fn user_box() {
     loop {
         // print current status
         print_board(&board);
-        let game_ended = board.status < 3;
+        println!();
 
         let legals = board.generate_legal_moves();
-
+        let game_ended = board.status < 3;
         if game_ended {
             match board.status {
                 0 => {println!("Game ended | Victory: X")},
@@ -30,16 +28,6 @@ pub fn user_box() {
         } else {
             if show_movegen {
                 println!("Legal moves: {:81b}", legals);
-            }
-            if show_eval {
-                if depth_eval != 0 {
-                    println!("Score ({}-depth): ", depth_eval);
-                    if show_bestline {
-                        println!("Line: ");
-                    }
-                } else {
-                    println!("Score (0-depth): {}", format_eval(eval(&board, &legals)));
-                }
             }
         }
         if show_ken {
@@ -52,8 +40,7 @@ pub fn user_box() {
             println!("Hint: type \"help\" to see list of commands.");
             hint_used = true;
         }
-
-        // return;
+        println!();
 
         loop {
             let mut input_line = String::new();
@@ -84,50 +71,116 @@ pub fn user_box() {
                         board.undo_move();
                         break;
                     }
-                    println!("can't undo no moves made");
+                    println!("Unable to undo a move: No move history left!");
                 },
                 "engine" => {
-                    println!("in dev");
+                    // TODO
+                },
+                "bestline" => {
+                    show_bestline = !show_bestline;
+                    if show_bestline {
+                        println!("Analysis line will be shown.");
+                    } else {
+                        println!("Analysis line will remain hidden.");
+                    }
                 },
                 "eval" => {
                     let depth = cmd[1].parse::<u8>().unwrap();
-                    if show_eval && depth == depth_eval {
-                        show_eval = false;
-                        println!("Eval hidden.");
+                    let score = if depth != 0 {
+                        // TODO
+                        "TODO".to_string()
                     } else {
-                        show_eval = true;
-                        depth_eval = depth;
-                        println!("Eval depth set to {}, type \"eval {}\" again to disable it.", depth, depth);
+                        format_eval(eval(&board, &legals))
+                    };
+                    println!("Score (depth {depth}): {}", score);
+                },
+                "history" => {
+                    show_history = !show_history;
+                    if show_history {
+                        println!("Move history will be visible.");
+                    } else {
+                        println!("Move history will be hidden.");
                     }
-                }
+                },
+                "ken" => {
+                    show_ken = !show_ken;
+                    if show_ken {
+                        println!("KEN will be visible.");
+                    } else {
+                        println!("KEN will be hidden.");
+                    }
+                },
+                "movegen" => {
+                    show_movegen = !show_movegen;
+                    if show_movegen {
+                        println!("Movegen string will be shown.");
+                    } else {
+                        println!("Movegen string will remain hidden.");
+                    }
+                },
+                "import" => {
+                    if cmd[1].contains("-") {
+                        if cmd.len() < 3 {
+                            cmd.push("-");
+                        }
+                        board.import_ken(&(cmd[1].to_owned() + " " + cmd[2]));
+                    } else {
+                        board.import_history(&cmd.iter().skip(1).cloned().collect::<Vec<_>>().join(" "));
+                    }
+                    println!("Import successful.");
+                    break;
+                },
+                "export" => {
+                    println!("KEN: {}", board.export_ken());
+                    println!("PGN: {}", board.export_history(1));
+                    if cmd.len() > 1 {
+                        println!("locals[0]: {:128b}", board.locals[0]);
+                        println!("locals[1]: {:128b}", board.locals[1]);
+                        println!("global[0]: {:16b}", board.global[0]);
+                        println!("global[1]: {:16b}", board.global[1]);
+                        println!("global[2]: {:16b}", board.global[2]);
+                        println!("lwbits:    {:128b}", board.lwbits);
+                        println!("turn:      {}", board.turn);
+                        println!("status:    {}", board.status);
+                    }
+                },
+                "reload" => {
+                    break;
+                },
+                "clear" => {
+                    board.clear();
+                    break;
+                },
                 "quit" => {
                     return;
                 },
                 "help" => {
-                    println!();
                     println!("List of commands:");
                     println!("___");
                     println!("a1             - make move (a1-i9), short and convenient form!");
                     println!("move a1        - make move (a1-i9)");
                     println!("undo           - undo last move");
                     println!("engine 10      - ask engine to make move (depth in half-moves, 1-81, rec. max. 10)");
-                    println!("eval 0         - show/hide evaluation after each player move (depth in half-moves, 0-81, rec. max. 8)");
                     println!("bestline       - show/hide proposed bestline by engine after engine/eval calls");
+                    println!("eval 0         - evaluate position (depth in half-moves, 0-81, rec. max. 8, 0 won't show any line)");
                     println!("history        - hide/show move history after each move");
                     println!("ken            - hide/show Kochergin-Efimov Notation after each move");
                     println!("movegen        - show/hide movegen string after each move");
                     println!("import <ken>   - import position from ken");
                     println!("import <moves> - import position from move history");
-                    println!("export         - export position with board debug information");
+                    println!("export         - export position");
+                    println!("export d       - export position with debug information");
+                    println!("reload         - show board again");
+                    println!("clear          - clear board");
                     println!("quit           - shutdown application (bro just close the window)");
                     println!("___");
-                    println!("Note: try to not make typos, it's just a temporary interface, may (will) crash");
-                    println!();
+                    println!("Note: try not tp make typos, this temporary interface may (will) crash :(");
                 },
                 _ => {
                     println!("Unknown command?");
                 }
             }
+            println!();
         }
     }
 }
