@@ -1,28 +1,134 @@
 use std::io::stdin;
-use crate::{bitboard::GetBit, board::Board, engine::eval, lookups::DIV_LOOKUP};
+use crate::{bitboard::GetBit, board::{transform_move, Board, ERR_MOV}, engine::eval, lookups::DIV_LOOKUP};
 
 
 pub fn user_box() {
     let mut board = Board::default();
-    while board.status > 2 {
+
+    let mut hint_used = false;
+    let mut show_movegen = false;
+    let mut show_eval: bool = false;
+    let mut depth_eval = 0;
+    let mut show_bestline = false;
+    let mut show_history = true;
+    let mut show_ken = true;
+
+    loop {
         // print current status
         print_board(&board);
+        let game_ended = board.status < 3;
+
         let legals = board.generate_legal_moves();
-        println!("movegen string: {:81b}", legals);
-        println!("zero-depth eval score: {}", format_eval(eval(&board, &legals)));
-        println!("ken: {}", board.export_ken());
-        println!("move history {}", board.export_history(1));
+
+        if game_ended {
+            match board.status {
+                0 => {println!("Game ended | Victory: X")},
+                1 => {println!("Game ended | Victory: O")},
+                2 => {println!("Game ended | Draw")},
+                _ => {}
+            }
+        } else {
+            if show_movegen {
+                println!("Legal moves: {:81b}", legals);
+            }
+            if show_eval {
+                if depth_eval != 0 {
+                    println!("Score ({}-depth): ", depth_eval);
+                    if show_bestline {
+                        println!("Line: ");
+                    }
+                } else {
+                    println!("Score (0-depth): {}", format_eval(eval(&board, &legals)));
+                }
+            }
+        }
+        if show_ken {
+            println!("KEN: {}", board.export_ken());
+        }
+        if show_history {
+            println!("History: {}", board.export_history(1));
+        }
+        if !hint_used {
+            println!("Hint: type \"help\" to see list of commands.");
+            hint_used = true;
+        }
 
         // return;
 
-        // ask for user input
-        // let mut input_line = String::new();
-        // stdin().read_line(&mut input_line).expect("Failed to read a line");
-        // input_line.trim().split_whitespace().next().map(|s| s.to_string());
+        loop {
+            let mut input_line = String::new();
+            stdin().read_line(&mut input_line).expect("Failed to read a line");
+            let mut cmd = input_line.trim().split(' ').collect::<Vec<&str>>();
 
-        let mov = user_input_move(legals);
-        println!("move index accepted: {}", mov);
-        board.make_move(mov);
+            /* quick move */
+            let b = cmd[0].as_bytes();
+            if b.len() == 2 {  // && (b'a'..=b'i').contains(&b[0]) && (b'1'..=b'9').contains(&b[1]) {
+                if cmd.len() > 1 {
+                    cmd[1] = cmd[0];
+                } else {
+                    cmd.push(cmd[0]);
+                }
+                cmd[0] = "move";
+            }
+
+            match cmd[0] {
+                "move" => {
+                    let mov = transform_move(cmd[1], legals);
+                    if mov != ERR_MOV {
+                        board.make_move(mov);
+                        break;
+                    }
+                },
+                "undo" => {
+                    if !board.moves.is_empty() {
+                        board.undo_move();
+                        break;
+                    }
+                    println!("can't undo no moves made");
+                },
+                "engine" => {
+                    println!("in dev");
+                },
+                "eval" => {
+                    let depth = cmd[1].parse::<u8>().unwrap();
+                    if show_eval && depth == depth_eval {
+                        show_eval = false;
+                        println!("Eval hidden.");
+                    } else {
+                        show_eval = true;
+                        depth_eval = depth;
+                        println!("Eval depth set to {}, type \"eval {}\" again to disable it.", depth, depth);
+                    }
+                }
+                "quit" => {
+                    return;
+                },
+                "help" => {
+                    println!();
+                    println!("List of commands:");
+                    println!("___");
+                    println!("a1             - make move (a1-i9), short and convenient form!");
+                    println!("move a1        - make move (a1-i9)");
+                    println!("undo           - undo last move");
+                    println!("engine 10      - ask engine to make move (depth in half-moves, 1-81, rec. max. 10)");
+                    println!("eval 0         - show/hide evaluation after each player move (depth in half-moves, 0-81, rec. max. 8)");
+                    println!("bestline       - show/hide proposed bestline by engine after engine/eval calls");
+                    println!("history        - hide/show move history after each move");
+                    println!("ken            - hide/show Kochergin-Efimov Notation after each move");
+                    println!("movegen        - show/hide movegen string after each move");
+                    println!("import <ken>   - import position from ken");
+                    println!("import <moves> - import position from move history");
+                    println!("export         - export position with board debug information");
+                    println!("quit           - shutdown application (bro just close the window)");
+                    println!("___");
+                    println!("Note: try to not make typos, it's just a temporary interface, may (will) crash");
+                    println!();
+                },
+                _ => {
+                    println!("Unknown command?");
+                }
+            }
+        }
     }
 }
 
