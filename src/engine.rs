@@ -105,9 +105,11 @@ impl Engine {
 }
 
 
-// Before calling this function, search MUST determine if the game already ended!
-// legals - legal moves, eval takes in account (heuristically) number of moves available, and returns better score in case it's more than threshold
-// it's made as a passable argument to avoid duplicate calculations
+/* Before calling this function, search MUST determine if the game already ended!
+   legals - legal moves, eval takes in account (heuristically) number of moves available, and returns better score in case it's more than threshold
+   it's made as a passable argument to avoid duplicate calculations */
+/* note: can't tell if it's naive or complex enough bc of the weird rules of UTTT;
+        I totally can apply weights depending on the possibilities of win (e.g. 1 open lane vs 3/4), but is it necessary? */
 pub fn eval(board: &Board, legals: &u128) -> i16 {
     let mut score = 0;
 
@@ -128,8 +130,8 @@ pub fn eval(board: &Board, legals: &u128) -> i16 {
             continue;
         }
         // don't check for global[2] (draw), because the real draw happens when there's no xpos and no opos
-        let xs = (board.locals[0] & SUB_LOOKUP[i as usize]) >> i * 9;
-        let os = (board.locals[1] & SUB_LOOKUP[i as usize]) >> i * 9;
+        let xs = (board.locals[0] & SUB_LOOKUP[i as usize]) >> (i * 9);
+        let os = (board.locals[1] & SUB_LOOKUP[i as usize]) >> (i * 9);
         let lbs = xs as usize | (os << 9) as usize;
         let mut draw_flg = true;
         if LEVAL_XPOS[lbs] {
@@ -186,7 +188,7 @@ pub fn eval(board: &Board, legals: &u128) -> i16 {
             }
         }
     }
-    score += x1 * 10 + x2 - o1 * 10 - o2;
+    score += x1 * 10 + x2 + o1 * 10 + o2;
 
     // applying move count heuristic
     if legals.count_ones() > 9 {

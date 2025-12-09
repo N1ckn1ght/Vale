@@ -49,10 +49,9 @@ impl Board {
         let sup1 = iter.next().unwrap_or("9-9-9-9-9-9-9-9-9");
         let sup2 = iter.next().unwrap_or("-");
         let parts = sup1.split('-');
-        let mut bit = 81;
+        let mut bit = 0;
         for part in parts.into_iter() {
             for char in part.chars() {
-                bit -= 1;
                 match char {
                     'x' => {
                         self.locals[0].set_bit(bit);
@@ -64,9 +63,10 @@ impl Board {
                     },
                     _ => {
                         let skip = char.to_digit(10).unwrap() as u8;
-                        bit -= skip - 1;
+                        bit += skip - 1;
                     }
                 }
+                bit += 1;
             }
         }
 
@@ -122,7 +122,7 @@ impl Board {
         }
 
         if sup2 != "-" {
-            let last_mov = transform_move(&sup2, !0); 
+            let last_mov = transform_move(sup2, !0); 
             if last_mov != ERR_MOV {
                 self.moves.push(last_mov);
                 // unused?
@@ -135,9 +135,12 @@ impl Board {
 
     pub fn import_history(&mut self, moves: &str) {
         self.clear();
-        let parts = moves.split(' ');
+        let parts = moves.split_whitespace();
         let mut hist = String::new();
         for part in parts.into_iter() {
+            if part.ends_with('.') {
+                continue;
+            }
             let mov = transform_move(part, self.generate_legal_moves());
             if mov == ERR_MOV {
                 println!("#DEBUG Illegal move: {}\n#DEBUG Applied sequence: {}", part, hist);
@@ -149,9 +152,45 @@ impl Board {
         }
     }
 
-    // pub fn export_ken(&self) -> String {
-        
-    // }
+    pub fn export_ken(&self) -> String {
+        let mut ken = String::new();
+        let mut empty = 0;
+        for bit in 0..81 {
+            let xbit = self.locals[0].get_bit(bit);
+            let obit = self.locals[1].get_bit(bit);
+            if xbit != 0 {
+                if empty != 0 {
+                    ken += &((b'1' + empty - 1) as char).to_string();
+                    empty = 0;
+                }
+                ken += "x";
+            } else if obit != 0 {
+                if empty != 0 {
+                    ken += &((b'1' + empty - 1) as char).to_string();
+                    empty = 0;
+                }
+                ken += "o";
+            } else {
+                empty += 1;
+            }
+            if MOD_LOOKUP[bit as usize] > 7 {
+                if empty != 0 {
+                    ken += &((b'1' + empty - 1) as char).to_string();
+                    empty = 0;
+                }
+                if bit != 80 {
+                    ken += "-";
+                }
+            }
+        }
+        ken += " ";
+        if self.moves.is_empty() {
+            ken += "-";
+        } else {
+            ken += &transform_move_back(*self.moves.last().unwrap());
+        }
+        ken
+    }
 
     pub fn export_history(&self, format: u8) -> String {
         /* format 0 - string of moves with no dividers
@@ -159,18 +198,23 @@ impl Board {
            format 2 - pgn-like format separated by \n every full move */
         if self.moves.is_empty() {
             println!("#DEBUG No moves were made.");
-            "".to_string();
+            return "".to_string();
         }
         if self.history[0] != 0 {
             println!("#DEBUG Cannot export REAL move history: game was imported by ken, no initial move history available!");
         }
         let mut history = String::new();
         let mut cnt: u16 = 2;
+        if (self.moves.len() as u16 + self.turn as u16).get_bit(0) != 0 {
+            cnt += 1;
+            if format != 0 {
+                history += "1. ... ";
+            }
+        } 
         for mov in self.moves.iter() {
             if format != 0 && cnt.get_bit(0) == 0 {
                 history += &format!("{}. ", cnt / 2);
             }
-            // todo
             history += &transform_move_back(*mov);
             if format == 2 && cnt.get_bit(0) != 0 {
                 history += "\n";
@@ -240,10 +284,8 @@ impl Board {
                 }
             }
 
-            if !global_win_occured {
-                if self.global[0] | self.global[1] | self.global[2] == SF {
-                    self.status = 2;
-                }
+            if !global_win_occured && self.global[0] | self.global[1] | self.global[2] == SF {
+                self.status = 2;
             }
         } else {
             let op_turn = !self.turn as usize;
@@ -372,7 +414,7 @@ mod tests {
     }
 
     #[test]
-    fn board_move_generation() {
+    fn board_generate_moves() {
         let mut board = Board::default();
 
         board.make_move(0);
@@ -402,7 +444,7 @@ mod tests {
     }
 
     #[test]
-    fn board_move_generation_perft_pre_local_wins() {
+    fn board_perft_pre_local_wins() {
         let mut board = Board::default();
         assert_eq!(board.perft(1), 81);
         assert_eq!(board.perft(2), 720);
@@ -413,7 +455,7 @@ mod tests {
 
     /* NOT VERIFIED ! */
     #[test]
-    fn board_move_generation_perft_past_local_wins() {
+    fn board_perft_past_local_wins() {
         let mut board = Board::default();
         assert_eq!(board.perft(6), 4020960);
         assert_eq!(board.perft(7), 33782544);
@@ -421,12 +463,12 @@ mod tests {
     }
 
     #[test]
-    fn board_imports() {
+    fn board_import_export() {
         let mut board1 = Board::default();
         board1.make_move(0);
         board1.make_move(1);
         let mut board2 = Board::default();
-        board2.import_ken("9-9-9-9-9-9-9-9-7ox b1");
+        board2.import_ken("xo7-9-9-9-9-9-9-9-9 b1");
         assert_eq!(board1.generate_legal_moves(), board2.generate_legal_moves());
         assert_eq!(board1.locals[0], board2.locals[0]);
         assert_eq!(board1.locals[1], board2.locals[1]);
@@ -436,26 +478,78 @@ mod tests {
         board1.import_history("e5 d6 b8 e6 e8 f6 h8");
         assert_eq!(board1.generate_legal_moves(), 0b111101111111101111111101111111111111000000000111111111111111111111111111111111111);
 
-        /* old tests, disincluding last move made */
+        board1.import_history("1. e5 d6 2. b8 e6 3. e8 f6 4. h8 a9 5. a7 a1 6. a2 a6 7. b9 e7 8. e1 d3 9. c9");
+        board2.import_ken("o2x5-1x4o2-9-6o2-4x1ooo-9-x3x1oxx-1o2x4-4x4 c9");
+        assert_eq!(board1.generate_legal_moves(), board2.generate_legal_moves());
+        assert_eq!(board1.locals[0], board2.locals[0]);
+        assert_eq!(board1.locals[1], board2.locals[1]);
+        assert_eq!(board1.global[0], board2.global[0]);
+        assert_eq!(board1.global[1], board2.global[1]);
+        assert_eq!(board1.global[2], board2.global[2]);
 
-        let mut board = Board::default();
-        board.import_ken("9-9-9-9-o3x4-9-9-9-9");
-        assert_eq!(board.locals[0], 0b000000000000000000000000000000000000000010000000000000000000000000000000000000000);
-        assert_eq!(board.locals[1], 0b000000000000000000000000000000000000100000000000000000000000000000000000000000000);
-        assert_eq!(board.global, [0, 0, 0]);
-        assert_eq!(board.status, 3);
-        assert_eq!(board.turn, false);
+        board1.import_ken("9-9-9-9-4x3o-9-9-9-9");
+        assert_eq!(board1.locals[0], 0b000000000000000000000000000000000000000010000000000000000000000000000000000000000);
+        assert_eq!(board1.locals[1], 0b000000000000000000000000000000000000100000000000000000000000000000000000000000000);
+        assert_eq!(board1.global, [0, 0, 0]);
+        assert_eq!(board1.status, 3);
+        assert_eq!(board1.turn, false);
 
-        board.import_ken("2x2x2x-o3o3o-9-9-4ox3-9-9-9-xxoooxxox");
-        assert_eq!(board.locals[0], 0b001001001000000000000000000000000000000001000000000000000000000000000000110001101);
-        assert_eq!(board.locals[1], 0b000000000100010001000000000000000000000010000000000000000000000000000000001110010);
-        assert_eq!(board.global, [0b100000000, 0b010000000, 0b000000001]);
-        assert_eq!(board.status, 3);
-        assert_eq!(board.turn, true);
+        board1.import_ken("xoxxoooxx-9-9-9-3xo4-9-9-o3o3o-x2x2x2");
+        assert_eq!(board1.locals[0], 0b001001001000000000000000000000000000000001000000000000000000000000000000110001101);
+        assert_eq!(board1.locals[1], 0b000000000100010001000000000000000000000010000000000000000000000000000000001110010);
+        assert_eq!(board1.global, [0b100000000, 0b010000000, 0b000000001]);
+        assert_eq!(board1.status, 3);
+        assert_eq!(board1.turn, true);
 
-        board.import_ken("2x2x2x-o3o3o-3ooo3-1x2x2x1-x3x3x-ooo6-6ooo-x2x2x2-xoxooxxxo");
-        assert_eq!(board.global, [0b100110010, 0b011001100, 0b000000001]);
-        assert_eq!(board.status, 2);
-        assert_eq!(board.turn, true);
+        board1.import_ken("oxxxooxox-2x2x2x-ooo6-6ooo-x3x3x-1x2x2x1-3ooo3-o3o3o-x2x2x2");
+        assert_eq!(board1.global, [0b100110010, 0b011001100, 0b000000001]);
+        assert_eq!(board1.status, 2);
+        assert_eq!(board1.turn, true);
+
+        board1.clear();
+        for _ in 0..20 {
+            let mut leg = board1.generate_legal_moves();
+            board1.make_move(leg.pop_bit());
+        }
+        for i in 0..8 {
+            let hist = board1.export_history(i);
+            board2.import_history(&hist);
+            assert_eq!(board1.generate_legal_moves(), board2.generate_legal_moves());
+            assert_eq!(board1.locals[0], board2.locals[0]);
+            assert_eq!(board1.locals[1], board2.locals[1]);
+            assert_eq!(board1.global[0], board2.global[0]);
+            assert_eq!(board1.global[1], board2.global[1]);
+            assert_eq!(board1.global[2], board2.global[2]);
+            for _ in 0..5 {
+                let mut leg = board1.generate_legal_moves();
+                let bit = leg.pop_bit();
+                board1.make_move(bit);
+                board2.make_move(bit);
+                assert_eq!(board1.generate_legal_moves(), board2.generate_legal_moves());
+                assert_eq!(board1.locals[0], board2.locals[0]);
+                assert_eq!(board1.locals[1], board2.locals[1]);
+                assert_eq!(board1.global[0], board2.global[0]);
+                assert_eq!(board1.global[1], board2.global[1]);
+                assert_eq!(board1.global[2], board2.global[2]);
+            }
+            for _ in 0..5 {
+                board1.undo_move();
+                board2.undo_move();
+                assert_eq!(board1.generate_legal_moves(), board2.generate_legal_moves());
+                assert_eq!(board1.locals[0], board2.locals[0]);
+                assert_eq!(board1.locals[1], board2.locals[1]);
+                assert_eq!(board1.global[0], board2.global[0]);
+                assert_eq!(board1.global[1], board2.global[1]);
+                assert_eq!(board1.global[2], board2.global[2]);
+            }
+            board2.clear();
+        }
+        board2.import_ken(&board1.export_ken());
+        assert_eq!(board1.generate_legal_moves(), board2.generate_legal_moves());
+        assert_eq!(board1.locals[0], board2.locals[0]);
+        assert_eq!(board1.locals[1], board2.locals[1]);
+        assert_eq!(board1.global[0], board2.global[0]);
+        assert_eq!(board1.global[1], board2.global[1]);
+        assert_eq!(board1.global[2], board2.global[2]);
     }
 }

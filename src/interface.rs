@@ -4,15 +4,14 @@ use crate::{bitboard::GetBit, board::Board, engine::eval, lookups::DIV_LOOKUP};
 
 pub fn user_box() {
     let mut board = Board::default();
-    // board.import_history("e5 d6 b8 e6 e8 f6 h8");
-    // let mut board = Board::init("9-9-9-9-9-9-9-9-9 -");
-    // board.import("9-9-9-9-9-9-9-9-7ox b1");
     while board.status > 2 {
         // print current status
         print_board(&board);
         let legals = board.generate_legal_moves();
-        println!("movegen string: {}", format!("{:81b}", legals));
+        println!("movegen string: {:81b}", legals);
         println!("zero-depth eval score: {}", format_eval(eval(&board, &legals)));
+        println!("ken: {}", board.export_ken());
+        println!("move history {}", board.export_history(1));
 
         // return;
 
@@ -24,12 +23,6 @@ pub fn user_box() {
         let mov = user_input_move(legals);
         println!("move index accepted: {}", mov);
         board.make_move(mov);
-        // println!("mov history test 0");
-        // println!("{}", board.export_history(0));
-        // println!("mov history test 1");
-        // println!("{}", board.export_history(1));
-        // println!("mov history test 2");
-        // println!("{}", board.export_history(2));
     }
 }
 

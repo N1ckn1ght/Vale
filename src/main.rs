@@ -4,8 +4,7 @@ mod board;
 mod engine;
 mod interface;
 
-use core::time;
-use std::{thread::sleep, time::Instant};
+use std::time::Instant;
 use crate::{board::Board, interface::user_box};
 
 
