@@ -99,7 +99,7 @@ impl Engine {
     }
 
     pub fn search(&mut self) {
-
+        
     }
 }
 
@@ -107,8 +107,8 @@ impl Engine {
 /* Before calling this function, search MUST determine if the game already ended!
    legals - legal moves, eval takes in account (heuristically) number of moves available, and returns better score in case it's more than threshold
    it's made as a passable argument to avoid duplicate calculations */
-/* note: can't tell if it's naive or complex enough bc of the weird rules of UTTT;
-        I totally can apply weights depending on the possibilities of win (e.g. 1 open lane vs 3/4), but is it necessary? */
+/* This eval is temporary.
+   I think I should apply weights depending on the possibilities of win (e.g. 1 open lane vs 3/4) */
 pub fn eval(board: &Board, legals: &u128) -> i16 {
     let mut score = 0;
 
@@ -363,6 +363,6 @@ mod tests {
     #[test]
     fn eval_specific() {
         // change this test with every change of eval()
-        
+
     }
 }
