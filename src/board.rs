@@ -4,6 +4,7 @@ pub const MOV_CAP: usize = 82;
 pub const ERR_MOV: u8 = 128;
 
 
+#[derive(Clone)]
 pub struct Board {
     pub global:   [u16; 3],   // sub-boards completion (or The Global Board)
                               // 0 - X won, 1 - O won, 2 - Draw on board (9 bits used)

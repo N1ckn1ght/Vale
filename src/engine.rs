@@ -5,6 +5,7 @@ use crate::{bitboard::{GetBit, PopBit, SetBit}, board::Board, lookups::{SUB_LOOK
 // search aux
 const PLY_LIMIT: usize = 81;
 const INF: i16 = 16384;
+const LARGE: i16 = 8192;
 
 // eval weights
 pub static LEVAL_WEIGHTS: Lazy<Box<[i8]>> = Lazy::new(|| {
@@ -29,8 +30,6 @@ pub static LEVAL_OPOS: Lazy<Box<[bool]>> = Lazy::new(|| {
 
 
 pub struct Engine {
-    board:    Board,
-
     /* Search trackers */
     ts:       Instant,                       // timer start
     tl:       u128,                          // time limit in ms
@@ -45,12 +44,10 @@ pub struct Engine {
 
 }
 
-impl Engine {
-    pub fn init() -> Self {
-        let board = Board::default();
-        
+impl Default for Engine {
+    // generate empty and ready to play board
+    fn default() -> Self {
         Self {
-            board,
             ts: Instant::now(),
             tl: 0,
             abort: false,
@@ -62,8 +59,25 @@ impl Engine {
             cur_ply: 0
         }
     }
+}
 
-    pub fn think(&mut self, aspiration_window: i32, time_limit_ms: u128, depth_limit: i8) {
+impl Engine {
+    pub fn update(&mut self) {
+        if self.ts.elapsed().as_millis() > self.tl {
+            self.abort = true;
+        }
+
+        // add comms here
+    }
+
+    // pass board clone
+    pub fn think(
+        &mut self,
+        board: &mut Board,
+        aspiration_window: i32,
+        time_limit_ms: u128,
+        depth_limit: i8
+    ) {
         self.ts = Instant::now();
         self.tl = time_limit_ms;
         self.abort = false;
@@ -82,7 +96,7 @@ impl Engine {
         let mut score =  0;
         let mut delta =  1;
         self.cur_ply = 1;
-        let legals = self.board.generate_legal_moves();
+        let legals = board.generate_legal_moves();
         
         loop {
             self.tpv_flag = true;
@@ -98,8 +112,32 @@ impl Engine {
         }
     }
 
-    pub fn search(&mut self) {
+    pub fn search(
+        &mut self,
+        board: &mut Board,
+        mut alpha: i16,
+        beta: i16,
+        mut depth: i16
+    ) -> i16 {
+        self.nodes += 1;
+        self.tpv_len[self.ply] = self.ply;
+
+        match board.status {
+            3 => {},
+            2 => { return 0; },
+            _ => { return -LARGE + self.ply as i16 }
+        }
+
+        let legals = board.generate_legal_moves();
+
+        if depth == 0 || self.ply > PLY_LIMIT {
+            return eval(&board, &legals);
+        }
+
+        // pre-sort?
         
+
+        0
     }
 }
 
