@@ -431,8 +431,13 @@ mod tests {
     fn eval_limits() {
         let mut board = Board::default();
         board.import_ken("xx1xxx1xx-1xxx1xxx1-xx1x1x1xx-1xxx1xxx1-xx1x1x1xx-1xxx1xxx1-xx1x1x1xx-1xxx1xxx1-xx1xxx1xx -");
+        let ev1 = eval(&board, &board.generate_legal_moves());
+        assert!(ev1 > 0);
+        assert!(ev1 < LARGE);
+        board.import_ken("xx1xxx1xx-1xxxxxxx1-xx1x1x1xx-1xxxxxxx1-xx1x1x1xx-1xxxxxxx1-xx1x1x1xx-1xxxxxxx1-xx1xxx1xx -");
         assert!(eval(&board, &board.generate_legal_moves()) > 0);
         assert!(eval(&board, &board.generate_legal_moves()) < LARGE);
+        assert!(eval(&board, &board.generate_legal_moves()) > ev1);
 
         let mut board = Board::default();
         board.import_ken("oo1o1o1oo-1ooo1ooo1-oo1o1o1oo-1ooo1ooo1-oo1ooo1oo-1ooo1ooo1-oo1o1o1oo-1ooo1ooo1-oo1o1o1oo -");
