@@ -37,7 +37,7 @@ pub fn user_box() {
             println!("History: {}", board.export_history(1));
         }
         if !hint_used {
-            println!("Hint: type \"help\" to see list of commands.");
+            println!("Hint: type \"help\" to see the list of commands.");
             hint_used = true;
         }
         println!();

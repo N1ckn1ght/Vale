@@ -1,11 +1,11 @@
-use std::{cmp::{max, min}, time::Instant};
+use std::{cmp::{Reverse, max, min}, time::Instant};
 use once_cell::sync::Lazy;
 use crate::{bitboard::{GetBit, PopBit, SetBit}, board::Board, lookups::{SUB_LOOKUP, WIN_LOOKUP}};
 
 // search aux
 const PLY_LIMIT: usize = 81;
 const INF: i16 = 16384;
-const LARGE: i16 = 8192;
+const LARGE: i16 = 8192;  // careful, it's used as |= MASK in search() for tpv
 
 // eval weights
 pub static LEVAL_WEIGHTS: Lazy<Box<[i8]>> = Lazy::new(|| {
@@ -37,7 +37,7 @@ pub struct Engine {
     nodes:    u64,                           // nodes searched
     ply:      usize,                         // current distance to the search root
     
-    tpv:      [[i8; PLY_LIMIT]; PLY_LIMIT],  // triangular table of a principal variation
+    tpv:      [[u8; PLY_LIMIT]; PLY_LIMIT],  // triangular table of a principal variation
     tpv_len:  [usize; PLY_LIMIT],            // current length of tpv
     tpv_flag: bool,                          // is this variation the principle one
     cur_ply:  i8,                            // current depth
@@ -128,19 +128,48 @@ impl Engine {
             _ => { return -LARGE + self.ply as i16 }
         }
 
-        let legals = board.generate_legal_moves();
+        let mut legals = board.generate_legal_moves();
 
         if depth == 0 || self.ply > PLY_LIMIT {
             return eval(&board, &legals);
         }
 
+        if depth > 1{
+            let mut presort: Vec<(u8, i16)> = Vec::with_capacity(legals.count_ones() as usize);
+            let mut lcopy = legals;
+            while legals != 0 {
+                let bit = legals.pop_bit();
+                board.make_move(bit);
+                let mut score = eval(board, &board.generate_legal_moves());
+                board.undo_move();
+                if board.turn {
+                    score = -score;
+                }
+                // principal variation goes first
+                if bit == self.tpv[0][self.ply] {
+                    score |= LARGE;
+                }
+                presort.push((bit, score));
+            }
+            presort.sort_by_key(|&(_, score)| Reverse(score));
+
+            for (i, (mov, _)) in presort.iter().enumerate() {
+                
+            }
+        } else {
+            while legals != 0 {
+                let bit = legals.pop_bit();
+                board.make_move(bit);
+                
+                board.undo_move();
+            }
+        }
         // pre-sort?
         
 
         0
     }
 }
-
 
 /* Before calling this function, search MUST determine if the game already ended!
    legals - legal moves, eval takes in account (heuristically) number of moves available, and returns better score in case it's more than threshold
@@ -396,6 +425,19 @@ mod tests {
         board.make_move(transform_move("d8", legals));
         let eval5 = eval(&board, &legals);
         assert!(eval5 <= eval1 && eval5 <= eval2 && eval5 <= eval3 && eval5 <= eval4);
+    }
+
+    #[test]
+    fn eval_limits() {
+        let mut board = Board::default();
+        board.import_ken("xx1xxx1xx-1xxx1xxx1-xx1x1x1xx-1xxx1xxx1-xx1x1x1xx-1xxx1xxx1-xx1x1x1xx-1xxx1xxx1-xx1xxx1xx -");
+        assert!(eval(&board, &board.generate_legal_moves()) > 0);
+        assert!(eval(&board, &board.generate_legal_moves()) < LARGE);
+
+        let mut board = Board::default();
+        board.import_ken("oo1o1o1oo-1ooo1ooo1-oo1o1o1oo-1ooo1ooo1-oo1ooo1oo-1ooo1ooo1-oo1o1o1oo-1ooo1ooo1-oo1o1o1oo -");
+        assert!(eval(&board, &board.generate_legal_moves()) < 0);
+        assert!(eval(&board, &board.generate_legal_moves()) > -LARGE);
     }
 
     #[test]
