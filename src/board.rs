@@ -330,12 +330,12 @@ impl Board {
 }
 
 pub fn transform_move(user_mov: &str, legals: u128) -> u8 {
-    let chars = user_mov.trim().chars();
-    if chars.count() != 2 {
+    let mut chars = user_mov.trim().chars();
+    let cnt = chars.clone().count();
+    if cnt < 2 {
         println!("#DEBUG Wrong user input: must be from a1 to i9 (expected 2 chars)");
         return ERR_MOV;
     }
-    let mut chars = user_mov.trim().chars();
     let file = chars.next().unwrap().to_ascii_lowercase();
     let rank = chars.next().unwrap();
     if !(('a'..='i').contains(&file) && ('1'..='9').contains(&rank)) {

@@ -174,7 +174,7 @@ pub fn user_box() {
                     println!("clear          - clear board");
                     println!("quit           - shutdown application (bro just close the window)");
                     println!("___");
-                    println!("Note: try not tp make typos, this temporary interface may (will) crash :(");
+                    println!("Note: try not to make any typos, this interface is freaky.");
                 },
                 _ => {
                     println!("Unknown command?");
