@@ -7,7 +7,6 @@ const PLY_LIMIT: usize = 81;
 const INF: i16 = 16384;
 
 // eval weights
-//pub static LEVAL_WEIGHTS: Lazy<[i8; 262144]> = Lazy::new(gen_leval_weights); 
 pub static LEVAL_WEIGHTS: Lazy<Box<[i8]>> = Lazy::new(|| {
     let mut v = vec![0i8; 262144];
     gen_leval_weights(&mut v);
@@ -308,5 +307,62 @@ fn gen_leval_opos(results: &mut [bool]) {
                 break;
             }
         }
+    }
+}
+
+
+#[cfg(test)]
+mod tests {
+    use crate::board::transform_move;
+
+    use super::*;
+
+    #[test]
+    fn eval_common_sense() {
+        // don't change this test unless you're 100% know what you're doing
+        let mut board = Board::default();
+        board.import_ken("xx1xox1xx-o8-9-o8-9-o8-9-o8-o8 b2");
+        assert!(eval(&board, &board.generate_legal_moves()) < 0);
+        board.import_ken("xx1x1xoxx-o8-9-o8-9-o8-9-o8-o8 a3");
+        assert!(eval(&board, &board.generate_legal_moves()) < 0);
+        board.import_ken("xxox1x1xx-o8-9-o8-9-o8-9-o8-o8 c1");
+        assert!(eval(&board, &board.generate_legal_moves()) < 0);
+        board.import_ken("9-9-9-9-4x4-9-9-9-9 e5");
+        assert!(eval(&board, &board.generate_legal_moves()) > 0);
+
+        board.import_history("1. e5 d6 2. a9 c7 3. i1 g3 4. a8 a5 5. c5 i5 6. g5 a6 7. a7 a1 8. b1 e1 9. e3 e9 10. d7 b2 11. d4 c3 12. i9 g8 13. c6 i8 14. g4 f6 15. g7 h8 16. e4 f1 17. h1 d1 18. e6");
+        let legals = board.generate_legal_moves();
+        let eval0 = eval(&board, &legals);
+        assert!(eval0 > 0);
+
+        board.make_move(transform_move("d9", legals));
+        let eval1 = eval(&board, &legals);
+        assert!(eval0 <= eval1);
+        board.undo_move();
+
+        board.make_move(transform_move("f9", legals));
+        let eval2 = eval(&board, &legals);
+        assert!(eval0 <= eval2);
+        board.undo_move();
+
+        board.make_move(transform_move("e8", legals));
+        let eval3 = eval(&board, &legals);
+        assert!(eval0 <= eval3);
+        board.undo_move();
+
+        board.make_move(transform_move("e7", legals));
+        let eval4 = eval(&board, &legals);
+        assert!(eval0 <= eval4);
+        board.undo_move();
+
+        board.make_move(transform_move("d8", legals));
+        let eval5 = eval(&board, &legals);
+        assert!(eval5 <= eval1 && eval5 <= eval2 && eval5 <= eval3 && eval5 <= eval4);
+    }
+
+    #[test]
+    fn eval_specific() {
+        // change this test with every change of eval()
+        
     }
 }
