@@ -8,11 +8,11 @@ const INF: i16 = 16384;
 const LARGE: i16 = 8192;  // careful, it's used as |= MASK in search() for tpv
 
 // eval weights
-pub static LEVAL_WEIGHTS: Lazy<Box<[i8]>> = Lazy::new(|| {
-    let mut v = vec![0i8; 262144];
-    gen_leval_weights(&mut v);
-    v.into_boxed_slice()
-});
+// pub static LEVAL_WEIGHTS: Lazy<Box<[i8]>> = Lazy::new(|| {
+//     let mut v = vec![0i8; 262144];
+//     gen_leval_weights(&mut v);
+//     v.into_boxed_slice()
+// });
 static ANCHOR_WEIGHTS: [i16; 9] = [3, 2, 3, 2, 4, 2, 3, 2, 3];
 const FREE_MOVE_FACT: i16 = 9;
 
@@ -165,6 +165,8 @@ impl Engine {
 /* This eval is temporary.
    I think I should apply weights depending on the possibilities of win (e.g. 1 open lane vs 3/4) */
 pub fn eval(board: &Board, legals: &u128) -> i16 {
+    return 0;
+    
     let mut score = 0;
 
     // getting LOCAL_EVALS related + other stuff that needs loop over locals
@@ -188,19 +190,19 @@ pub fn eval(board: &Board, legals: &u128) -> i16 {
         let os = (board.locals[1] & SUB_LOOKUP[i as usize]) >> (i * 9);
         let lbs = xs as usize | (os << 9) as usize;
         let mut draw_flg = true;
-        if LEVAL_XPOS[lbs] {
-            xpos.set_bit(i);
-            draw_flg = false;
-        }
-        if LEVAL_OPOS[lbs] {
-            opos.set_bit(i);
-            draw_flg = false;
-        }
+        // if LEVAL_XPOS[lbs] {
+        //     xpos.set_bit(i);
+        //     draw_flg = false;
+        // }
+        // if LEVAL_OPOS[lbs] {
+        //     opos.set_bit(i);
+        //     draw_flg = false;
+        // }
         // real draw check (may be avoided because LEVAL_WEIGHTS[lbs] returns 0, BUT needed if there are also other checks later)
         if draw_flg {
             continue;
         }
-        scores[i as usize] = LEVAL_WEIGHTS[lbs];
+        // scores[i as usize] = LEVAL_WEIGHTS[lbs];
         // applying KEY/ANCHOR CELLS (pre-sort optimization mostly) scores
         // note that local board is overridden if it's won
         if xs.get_bit(i) != 0 {  // && board.global[0].get_bit(i) == 0 {

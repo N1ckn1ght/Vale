@@ -10,9 +10,9 @@ use crate::{board::Board, interface::user_box};
 
 fn main() {
     println!("Hello, world!");
-    let _ = &*engine::LEVAL_WEIGHTS;
-    let _ = &*engine::LEVAL_XPOS;
-    let _ = &*engine::LEVAL_OPOS;
+    // let _ = &*engine::LEVAL_WEIGHTS;
+    // let _ = &*engine::LEVAL_XPOS;
+    // let _ = &*engine::LEVAL_OPOS;
     println!("Force init completed.");
 
     // perft(8);

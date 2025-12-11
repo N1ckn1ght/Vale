@@ -53,18 +53,23 @@ pub const WIN_LOOKUP_INDICES: [[usize; 2]; 9] = [[0, 3], [3, 2], [5, 3], [8, 2],
 
 /* Eval lookups */
 
+const POS_CNT: [u8; 4] = [12, 8, 4, 0];
+
 pub fn gen_local_maps() -> (Vec<u16>, Vec<u16>) {
     let mut xlocal = vec![0; 262144];
     let mut olocal = vec![0; 262144];
     
-    for permut in 0..262144 {
-        let mut xbits: u16 = permut & 0b111111111;
-        let mut obits: u16 = (permut >> 9) & 0b111111111;
+    for permut in 0usize..262144 {
+        let mut xbits = (permut & 0b111111111) as u16;
+        let mut obits = ((permut >> 9) & 0b111111111) as u16;
 
         // impossible
         if xbits & obits != 0 {
             continue;
         }
+
+        let mut x_left = [0; 4];
+        let mut o_left = [0; 4];
 
         for lookup in WIN_LOOKUP {
             let maskx = xbits & lookup;
@@ -74,16 +79,63 @@ pub fn gen_local_maps() -> (Vec<u16>, Vec<u16>) {
                 continue;
             }
             if maskx == 0 && masko == 0 {
-                // possib-3 ++ for XO
+                x_left[3] += 1;
+                o_left[3] += 1;
                 continue
             }
             if maskx != 0 {
-                // possib-1 or possib-2 ++ for X unless victory
+                match maskx.count_ones() {
+                    1 => { x_left[2] += 1; },
+                    2 => { x_left[1] += 1; },
+                    3 => {
+                        x_left[0] = 1;
+                        break;
+                    },
+                    _ => {}
+                }
             } else {
-                // possib-1 or possib-2 ++ for O unless victory
+                match masko.count_ones() {
+                    1 => { o_left[2] += 1; },
+                    2 => { o_left[1] += 1; },
+                    3 => {
+                        o_left[0] = 1;
+                        break;
+                    },
+                    _ => {}
+                }
             }
         }
+
+        if x_left[0] != 0 {
+            xlocal[permut] = 1 << POS_CNT[0];
+            continue;
+        }
+        if o_left[0] != 0 {
+            olocal[permut] = 1 << POS_CNT[0];
+            continue;
+        }
+        xlocal[permut] = x_left[1] << POS_CNT[1] | x_left[2] << POS_CNT[2] | x_left[3] << POS_CNT[3];
+        olocal[permut] = o_left[1] << POS_CNT[1] | o_left[2] << POS_CNT[2] | o_left[3] << POS_CNT[3];
     }
 
     (xlocal, olocal)
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn gen_local_maps_test() {
+        let (xl, ol) = gen_local_maps();
+
+        let t1 = 0b_000000000_000000000;
+        assert_eq!(xl[t1], 8 << POS_CNT[3]);
+        assert_eq!(ol[t1], 8 << POS_CNT[3]);
+
+        let t2 = 0b_000000010_000000001;
+        assert_eq!(xl[t1], 4 << POS_CNT[3] | 2 << POS_CNT[2]);
+        assert_eq!(ol[t1], 4 << POS_CNT[3] | 1 << POS_CNT[2]);
+    }
 }
