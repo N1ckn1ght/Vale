@@ -16,18 +16,6 @@ pub static LEVAL_WEIGHTS: Lazy<Box<[i8]>> = Lazy::new(|| {
 static ANCHOR_WEIGHTS: [i16; 9] = [3, 2, 3, 2, 4, 2, 3, 2, 3];
 const FREE_MOVE_FACT: i16 = 9;
 
-// eval aux
-pub static LEVAL_XPOS: Lazy<Box<[bool]>> = Lazy::new(|| {
-    let mut v = vec![false; 262144];
-    gen_leval_xpos(&mut v);
-    v.into_boxed_slice()
-});
-pub static LEVAL_OPOS: Lazy<Box<[bool]>> = Lazy::new(|| {
-    let mut v = vec![false; 262144];
-    gen_leval_opos(&mut v);
-    v.into_boxed_slice()
-});
-
 
 pub struct Engine {
     /* Search trackers */
@@ -134,7 +122,7 @@ impl Engine {
             return eval(&board, &legals);
         }
 
-        if depth > 1{
+        if depth > 1 {
             let mut presort: Vec<(u8, i16)> = Vec::with_capacity(legals.count_ones() as usize);
             let mut lcopy = legals;
             while legals != 0 {
@@ -266,115 +254,6 @@ pub fn eval(board: &Board, legals: &u128) -> i16 {
     }
 
     score
-}
-
-// the point of this function is to get and save relative score (+ for X, - for O) on a local board for further calculations
-// it does not account if it's possible to improve (from 0) score at all, so we have to use the following functions as well
-// note: the initial idea was to have x_score and o_score split, so this is an experiment
-fn gen_leval_weights(results: &mut [i8]) {
-    const ERR: i8 = 0;
-    const MX: i8 = 30;
-    for index in 0..262144 {
-        let bbx = (index & 0b111111111) as u16;
-        let bbo = ((index >> 9) & 0b111111111) as u16;
-        // if permutation is not possible
-        if bbx & bbo != 0 {
-            results[index] = ERR;
-            continue;
-        }
-        // if it's local win or not possible (aka double win)
-        let (mut xw, mut ow) = (false, false);
-        for lookup in WIN_LOOKUP.iter() {
-            if lookup & bbx == *lookup {
-                xw = true;
-                continue;
-            }
-            if lookup & bbo == *lookup {
-                ow = true;
-            }
-        }
-        if xw {
-            if ow {
-                results[index] = ERR;
-            } else {
-                results[index] = MX;
-            }
-            continue;
-        } else if ow {
-            results[index] = -MX;
-            continue;
-        }
-        // if permutation is possible and it's noone's win
-        // (guaranteed local draw will return 0 as well)
-        let (mut x1, mut x2, mut o1, mut o2) = (0, 0, 0, 0);
-        for lookup in WIN_LOOKUP.iter() {
-            let maskx = bbx & lookup;
-            let masko = bbo & lookup;
-            if maskx != 0 {
-                if masko != 0 {
-                    continue;
-                }
-                let cnt = maskx.count_ones();
-                if cnt > x1 {
-                    x2 = x1;
-                    x1 = cnt;
-                } else if cnt > x2 {
-                    x2 = cnt;
-                }
-            } else if masko != 0 {
-                let cnt = masko.count_ones();
-                if cnt > o1 {
-                    o2 = o1;
-                    o1 = cnt;
-                } else if cnt > o2 {
-                    o2 = cnt;
-                }
-            }
-        }
-        results[index] = x1 as i8 * 10 + x2 as i8 - o1 as i8 * 10 - o2 as i8;
-    }
-}
-
-// this returns true for cases when we can improve our position on a local board for X
-// if it's false, then X cannot ever win this local board
-fn gen_leval_xpos(results: &mut [bool]) {
-    for index in 0..262144 {
-        let bbx = (index & 0b111111111) as u16;
-        let bbo = ((index >> 9) & 0b111111111) as u16;
-        // if permutation is not possible
-        if bbx & bbo != 0 {
-            continue;
-        }
-        // just check if any possible to win, nothing more
-        for lookup in WIN_LOOKUP.iter() {
-            let masko = bbo & lookup;
-            if masko == 0 {
-                results[index] = true;
-                break;
-            }
-        }
-    }
-}
-
-// this returns true for cases when we can improve our position on a local board for O
-// if it's false, then O cannot ever win this local board
-fn gen_leval_opos(results: &mut [bool]) {
-    for index in 0..262144 {
-        let bbx = (index & 0b111111111) as u16;
-        let bbo = ((index >> 9) & 0b111111111) as u16;
-        // if permutation is not possible
-        if bbx & bbo != 0 {
-            continue;
-        }
-        // just check if any possible to win, nothing more
-        for lookup in WIN_LOOKUP.iter() {
-            let maskx = bbx & lookup;
-            if maskx == 0 {
-                results[index] = true;
-                break;
-            }
-        }
-    }
 }
 
 

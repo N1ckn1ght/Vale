@@ -1,3 +1,5 @@
+/* General lookups */
+
 pub const DIV_LOOKUP: [u8; 81] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 
                                   1, 1, 1, 1, 1, 1, 1, 1, 1,
                                   2, 2, 2, 2, 2, 2, 2, 2, 2,
@@ -47,3 +49,41 @@ pub const WIN_LOOKUP_INDEXED: [u16; 24] = [0b000000111, 0b001001001, 0b100010001
 pub const WIN_LOOKUP_INDICES: [[usize; 2]; 9] = [[0, 3], [3, 2], [5, 3], [8, 2], [10, 4], [14, 2], [16, 3], [19, 2], [21, 3]];
 
 // pub const BAD_LOOKUP: [u16; 4] = [0b001100010, 0b010001100, 0b010100001, 0b100001010];
+
+
+/* Eval lookups */
+
+pub fn gen_local_maps() -> (Vec<u16>, Vec<u16>) {
+    let mut xlocal = vec![0; 262144];
+    let mut olocal = vec![0; 262144];
+    
+    for permut in 0..262144 {
+        let mut xbits: u16 = permut & 0b111111111;
+        let mut obits: u16 = (permut >> 9) & 0b111111111;
+
+        // impossible
+        if xbits & obits != 0 {
+            continue;
+        }
+
+        for lookup in WIN_LOOKUP {
+            let maskx = xbits & lookup;
+            let masko = obits & lookup;
+            
+            if maskx != 0 && masko != 0 {
+                continue;
+            }
+            if maskx == 0 && masko == 0 {
+                // possib-3 ++ for XO
+                continue
+            }
+            if maskx != 0 {
+                // possib-1 or possib-2 ++ for X unless victory
+            } else {
+                // possib-1 or possib-2 ++ for O unless victory
+            }
+        }
+    }
+
+    (xlocal, olocal)
+}
