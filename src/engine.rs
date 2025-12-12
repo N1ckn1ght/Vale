@@ -1,18 +1,18 @@
 use std::{cmp::{Reverse, max, min}, time::Instant};
 use once_cell::sync::Lazy;
-use crate::{bitboard::{GetBit, PopBit, SetBit}, board::Board, lookups::{SUB_LOOKUP, WIN_LOOKUP}};
+use crate::{bitboard::{GetBit, PopBit, SetBit}, board::Board, lookups::{SUB_LOOKUP, WIN_LOOKUP, gen_local_maps}};
 
 // search aux
 const PLY_LIMIT: usize = 81;
 const INF: i16 = 16384;
 const LARGE: i16 = 8192;  // careful, it's used as |= MASK in search() for tpv
 
-// eval weights
-// pub static LEVAL_WEIGHTS: Lazy<Box<[i8]>> = Lazy::new(|| {
-//     let mut v = vec![0i8; 262144];
-//     gen_leval_weights(&mut v);
-//     v.into_boxed_slice()
-// });
+pub static LOCAL_MAPS: Lazy<(Box<[u16]>, Box<[u16]>)> = Lazy::new(|| {
+    let mut x = vec![0u16; 262144];
+    let mut o = vec![0u16; 262144];
+    gen_local_maps(&mut x, &mut o);
+    (x.into_boxed_slice(), o.into_boxed_slice())
+});
 static ANCHOR_WEIGHTS: [i16; 9] = [3, 2, 3, 2, 4, 2, 3, 2, 3];
 const FREE_MOVE_FACT: i16 = 9;
 
@@ -258,11 +258,15 @@ pub fn eval(board: &Board, legals: &u128) -> i16 {
     score
 }
 
+fn get_local_chance(xlocal: u16, olocal: u16) -> f32 {
+    
+    0.0
+}
+
 
 #[cfg(test)]
 mod tests {
     use crate::board::transform_move;
-
     use super::*;
 
     #[test]

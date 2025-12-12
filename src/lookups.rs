@@ -55,13 +55,10 @@ pub const WIN_LOOKUP_INDICES: [[usize; 2]; 9] = [[0, 3], [3, 2], [5, 3], [8, 2],
 
 const POS_CNT: [u8; 4] = [12, 8, 4, 0];
 
-pub fn gen_local_maps() -> (Vec<u16>, Vec<u16>) {
-    let mut xlocal = vec![0; 262144];
-    let mut olocal = vec![0; 262144];
-    
+pub fn gen_local_maps(xlocal: &mut [u16], olocal: &mut [u16]) {
     for permut in 0usize..262144 {
-        let mut xbits = (permut & 0b111111111) as u16;
-        let mut obits = ((permut >> 9) & 0b111111111) as u16;
+        let xbits = (permut & 0b111111111) as u16;
+        let obits = ((permut >> 9) & 0b111111111) as u16;
 
         // impossible
         if xbits & obits != 0 {
@@ -114,28 +111,99 @@ pub fn gen_local_maps() -> (Vec<u16>, Vec<u16>) {
             olocal[permut] = 1 << POS_CNT[0];
             continue;
         }
-        xlocal[permut] = x_left[1] << POS_CNT[1] | x_left[2] << POS_CNT[2] | x_left[3] << POS_CNT[3];
-        olocal[permut] = o_left[1] << POS_CNT[1] | o_left[2] << POS_CNT[2] | o_left[3] << POS_CNT[3];
+        xlocal[permut] = (x_left[1] << POS_CNT[1]) | (x_left[2] << POS_CNT[2]) | (x_left[3] << POS_CNT[3]);
+        olocal[permut] = (o_left[1] << POS_CNT[1]) | (o_left[2] << POS_CNT[2]) | (o_left[3] << POS_CNT[3]);
     }
-
-    (xlocal, olocal)
 }
 
 
 #[cfg(test)]
 mod tests {
+    use crate::bitboard::GetBit;
     use super::*;
 
     #[test]
     fn gen_local_maps_test() {
-        let (xl, ol) = gen_local_maps();
+        let mut xl = [0; 262144];
+        let mut ol = [0; 262144];
+        gen_local_maps(&mut xl, &mut ol);
 
         let t1 = 0b_000000000_000000000;
         assert_eq!(xl[t1], 8 << POS_CNT[3]);
         assert_eq!(ol[t1], 8 << POS_CNT[3]);
 
         let t2 = 0b_000000010_000000001;
-        assert_eq!(xl[t1], 4 << POS_CNT[3] | 2 << POS_CNT[2]);
-        assert_eq!(ol[t1], 4 << POS_CNT[3] | 1 << POS_CNT[2]);
+        assert_eq!(xl[t2], 4 << POS_CNT[3] | 2 << POS_CNT[2]);
+        assert_eq!(ol[t2], 4 << POS_CNT[3] | 1 << POS_CNT[2]);
+
+        let t3 = 0b_000000101_000010000;
+        assert_eq!(xl[t3], 1 << POS_CNT[3] | 2 << POS_CNT[2]);
+        assert_eq!(ol[t3], 1 << POS_CNT[3] | 2 << POS_CNT[2] | 1 << POS_CNT[1]);
+
+        let t4 = 0b_101000000_000010000;
+        assert_eq!(xl[t4], 1 << POS_CNT[3] | 2 << POS_CNT[2]);
+        assert_eq!(ol[t4], 1 << POS_CNT[3] | 2 << POS_CNT[2] | 1 << POS_CNT[1]);
+
+        let t5 = 0b_000000100_011000000;
+        assert_eq!(xl[t5], 2 << POS_CNT[3] | 2 << POS_CNT[2] | 1 << POS_CNT[1]);
+        assert_eq!(ol[t5], 2 << POS_CNT[3] | 2 << POS_CNT[2]);
+
+        let t6 = 0b_000010100_111000000;
+        assert!(xl[t6].get_bit(POS_CNT[0]) != 0);
+
+        let t7 = 0b_110101011_000000000;
+        assert_eq!(xl[t7], 1 << POS_CNT[3]);
+        assert_eq!(ol[t7], 1 << POS_CNT[3] | 7 << POS_CNT[1]);
+
+        let t8 = 0b_110101011_000010000;
+        assert_eq!(xl[t8], 1 << POS_CNT[2]);
+        assert_eq!(ol[t8], 4 << POS_CNT[1]);
+
+        let t9 = 0b_000000000_100011010;
+        assert_eq!(xl[t9], 5 << POS_CNT[2] | 3 << POS_CNT[1]);
+        assert_eq!(ol[t9], 0);
+
+        let t10 = 0b_011100101_100011010;
+        assert_eq!(xl[t10], 0);
+        assert_eq!(ol[t10], 0);
+
+        let t11 = 0b_001001000_110110000;
+        assert_eq!(xl[t11], 1 << POS_CNT[3] | 3 << POS_CNT[1]);
+        assert_eq!(ol[t11], 1 << POS_CNT[3] | 1 << POS_CNT[1]);
+
+        let t12 = 0b_000000001_000000010;
+        assert_eq!(xl[t12], 4 << POS_CNT[3] | 1 << POS_CNT[2]);
+        assert_eq!(ol[t12], 4 << POS_CNT[3] | 2 << POS_CNT[2]);
+
+        let t13 = 0b_000010000_000000101;
+        assert_eq!(xl[t13], 1 << POS_CNT[3] | 2 << POS_CNT[2] | 1 << POS_CNT[1]);
+        assert_eq!(ol[t13], 1 << POS_CNT[3] | 2 << POS_CNT[2]);
+
+        let t14 = 0b_000010000_101000000;
+        assert_eq!(xl[t14], 1 << POS_CNT[3] | 2 << POS_CNT[2] | 1 << POS_CNT[1]);
+        assert_eq!(ol[t14], 1 << POS_CNT[3] | 2 << POS_CNT[2]);
+
+        let t15 = 0b_011000000_000000100;
+        assert_eq!(xl[t15], 2 << POS_CNT[3] | 2 << POS_CNT[2]);
+        assert_eq!(ol[t15], 2 << POS_CNT[3] | 2 << POS_CNT[2] | 1 << POS_CNT[1]);
+
+        let t16 = 0b_111000000_000010100;
+        assert!(ol[t16].get_bit(POS_CNT[0]) != 0);
+
+        let t17 = 0b_000000000_110101011;
+        assert_eq!(xl[t17], 1 << POS_CNT[3] | 7 << POS_CNT[1]);
+        assert_eq!(ol[t17], 1 << POS_CNT[3]);
+
+        let t18 = 0b_000010000_110101011;
+        assert_eq!(xl[t18], 4 << POS_CNT[1]);
+        assert_eq!(ol[t18], 1 << POS_CNT[2]);
+
+        let t19 = 0b_100011010_000000000;
+        assert_eq!(xl[t19], 0);
+        assert_eq!(ol[t19], 5 << POS_CNT[2] | 3 << POS_CNT[1]);
+
+        let t20 = 0b_100011010_011100101;
+        assert_eq!(xl[t20], 0);
+        assert_eq!(ol[t20], 0);
     }
 }
