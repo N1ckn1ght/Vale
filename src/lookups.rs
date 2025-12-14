@@ -51,7 +51,7 @@ pub const WIN_LOOKUP_INDICES: [[usize; 2]; 9] = [[0, 3], [3, 2], [5, 3], [8, 2],
 // pub const BAD_LOOKUP: [u16; 4] = [0b001100010, 0b010001100, 0b010100001, 0b100001010];
 
 
-/* Eval lookups */
+/* Eval lookups (these are not "main" lookups eval uses, but useful for some Zugzwang checks; check engine.rs fn gen_local_chances) */
 
 const POS_CNT: [u8; 4] = [12, 8, 4, 0];
 
