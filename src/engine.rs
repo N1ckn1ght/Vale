@@ -1,19 +1,19 @@
 use std::{cmp::{Reverse, max, min}, time::Instant};
 use once_cell::sync::Lazy;
-use crate::{bitboard::{GetBit, PopBit, SetBit}, board::Board, lookups::{SUB_LOOKUP, WIN_LOOKUP, gen_local_maps}};
+use crate::{bitboard::{GetBit, PopBit, SetBit}, board::Board, lookups::{SUB_LOOKUP, WIN_LOOKUP}, weights::gen_local_scores};
 
 // search aux
 const PLY_LIMIT: usize = 81;
 const INF: i16 = 16384;
 const LARGE: i16 = 8192;  // careful, it's used as |= MASK in search() for tpv
 
-// pub static LOCAL_MAPS: Lazy<(Box<[u16]>, Box<[u16]>)> = Lazy::new(|| {
-//     let mut x = vec![0u16; 262144];
-//     let mut o = vec![0u16; 262144];
-//     gen_local_maps(&mut x, &mut o);
-//     (x.into_boxed_slice(), o.into_boxed_slice())
-// });
-// eval weights
+pub static LOCAL_SCORES: Lazy<(Box<[i16]>, Box<[i16]>)> = Lazy::new(|| {
+    let mut x = vec![0i16; 262144];
+    let mut o = vec![0i16; 262144];
+    gen_local_scores(&mut x, &mut o);
+    (x.into_boxed_slice(), o.into_boxed_slice())
+});
+// additional eval weights
 const FREE_MOVE_FACT: i16 = 9;
 static ANCHOR_WEIGHTS: [i16; 9] = [3, 2, 3, 2, 4, 2, 3, 2, 3];
 
@@ -256,50 +256,6 @@ pub fn eval(board: &Board, legals: &u128) -> i16 {
     }
 
     score
-}
-
-fn gen_local_chances(xchc: &mut [u16], ochc: &mut[u16]) {
-    let mut xlocal = [0; 262144];
-    let mut olocal = [0; 262144];
-    gen_local_maps(&mut xlocal, &mut olocal);
-
-    for permut in 0usize..262144 {
-        let xbits = (permut & 0b111111111) as u16;
-        let obits = ((permut >> 9) & 0b111111111) as u16;
-
-        // impossible
-        if xbits & obits != 0 {
-            continue;
-        }
-
-        // check for finished boards
-        let mut finish_flg = permut.count_ones() == 9;
-        for lookup in WIN_LOOKUP {
-            let maskx = xbits & lookup;
-            let masko = obits & lookup;
-
-            if maskx == lookup {
-                xchc[permut] = 1000;
-                finish_flg = true;
-                break;
-            }
-            if masko == lookup {
-                ochc[permut] = 1000;
-                finish_flg = true;
-                break;
-            }
-        }
-        if finish_flg {
-            continue;
-        }
-
-        // count probabilities
-        let mut x_win_cnt = 0;
-        let mut o_win_cnt = 0;
-        let mut draw_cnt = 0;
-
-        // do dfs? start it earlier?
-    }
 }
 
 
