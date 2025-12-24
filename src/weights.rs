@@ -1,11 +1,13 @@
 use std::cmp::min;
-use crate::lookups::{POS_CNT, POS_MASK, gen_local_maps};
+use crate::lookups::{POS_CNT, POS_MASK, gen_local_map};
 
 
 /* WEIGHTS PER WIN / THREAT / ATTACK / POSSIBILITY */
 
+pub const MAX_LOCAL_SCORE: i8 = 20;
+
 static POS_SCORE: [[i8; 9]; 4] = [
-    [  0, 24, 24, 24, 24, 24, 24, 24, 24],
+    [  0, 20, 20, 20, 20, 20, 20, 20, 20],
     [  0,  8,  9, 10, 10, 10, 10, 10, 10],
     [  0,  2,  6,  8,  9,  9,  9,  9,  9],
     [  0,  1,  2,  3,  4,  5,  6,  8,  8]
@@ -14,11 +16,7 @@ static POS_SCORE: [[i8; 9]; 4] = [
 
 /* WEIGHTS TO SCORE TRANSFORM */
 
-pub fn gen_local_scores(xscores: &mut [i16], oscores: &mut [i16]) {
-    let mut xlocal = [0; 262144];
-    let mut olocal = [0; 262144];
-    gen_local_maps(&mut xlocal, &mut olocal);
-
+pub fn gen_local_scores(xscores: &mut [i8], oscores: &mut [i8]) {
     for permut in 0usize..262144 {
         let xbits = (permut & 0b111111111) as u16;
         let obits = ((permut >> 9) & 0b111111111) as u16;
@@ -28,29 +26,32 @@ pub fn gen_local_scores(xscores: &mut [i16], oscores: &mut [i16]) {
             continue;
         }
 
-        if (xlocal[permut] >> POS_CNT[0]) & POS_MASK != 0 {
-            xscores[permut] = POS_SCORE[0][1] as i16;
+        let (xl, ol) = gen_local_map(permut);
+
+        if (xl >> POS_CNT[0]) & POS_MASK != 0 {
+            xscores[permut] = MAX_LOCAL_SCORE;
             continue;
         }
-        if (olocal[permut] >> POS_CNT[0]) & POS_MASK != 0 {
-            oscores[permut] = POS_SCORE[0][1] as i16;
+        if (ol >> POS_CNT[0]) & POS_MASK != 0 {
+            oscores[permut] = MAX_LOCAL_SCORE;
             continue;
         }
 
         xscores[permut] = min(
-            POS_SCORE[1][((xlocal[permut] >> POS_CNT[1]) & POS_MASK) as usize] +
-            POS_SCORE[2][((xlocal[permut] >> POS_CNT[2]) & POS_MASK) as usize] +
-            POS_SCORE[3][((xlocal[permut] >> POS_CNT[3]) & POS_MASK) as usize],
-            POS_SCORE[0][1] - 1
-        ) as i16;
+            POS_SCORE[1][((xl >> POS_CNT[1]) & POS_MASK) as usize] +
+            POS_SCORE[2][((xl >> POS_CNT[2]) & POS_MASK) as usize] +
+            POS_SCORE[3][((xl >> POS_CNT[3]) & POS_MASK) as usize],
+            MAX_LOCAL_SCORE - 1
+        );
         oscores[permut] = min(
-            POS_SCORE[1][((olocal[permut] >> POS_CNT[1]) & POS_MASK) as usize] +
-            POS_SCORE[2][((olocal[permut] >> POS_CNT[2]) & POS_MASK) as usize] +
-            POS_SCORE[3][((olocal[permut] >> POS_CNT[3]) & POS_MASK) as usize],
-            POS_SCORE[0][1] - 1
-        ) as i16;
+            POS_SCORE[1][((ol >> POS_CNT[1]) & POS_MASK) as usize] +
+            POS_SCORE[2][((ol >> POS_CNT[2]) & POS_MASK) as usize] +
+            POS_SCORE[3][((ol >> POS_CNT[3]) & POS_MASK) as usize],
+            MAX_LOCAL_SCORE - 1
+        );
     }
 }
+
 
 #[cfg(test)]
 mod tests {
@@ -76,10 +77,14 @@ mod tests {
 
         let t4 = 0b_111000000_000010100;
         assert_eq!(xs[t4], 0);
-        assert_eq!(os[t4], 24);  // ol[t4].get_bit(POS_CNT[0]) != 0
+        assert_eq!(os[t4], MAX_LOCAL_SCORE);  // ol[t4].get_bit(POS_CNT[0]) != 0
 
         let t5 = 0b_000000000_110101011;
-        assert_eq!(xs[t5], 23);
-        assert_eq!(os[t5], 0);
+        assert_eq!(xs[t5], 11);
+        assert_eq!(os[t5], 1);
+
+        let t6 = 0b_000000000_101000100;
+        assert_eq!(xs[t6], MAX_LOCAL_SCORE - 1);
+        assert_eq!(os[t6], 2);
     }
 }

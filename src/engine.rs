@@ -1,21 +1,18 @@
 use std::{cmp::{Reverse, max, min}, time::Instant};
 use once_cell::sync::Lazy;
-use crate::{bitboard::{GetBit, PopBit, SetBit}, board::Board, lookups::{SUB_LOOKUP, WIN_LOOKUP}, weights::gen_local_scores};
+use crate::{bitboard::{GetBit, PopBit, SetBit}, board::Board, lookups::{SUB_LOOKUP, WIN_LOOKUP}, weights::{MAX_LOCAL_SCORE, gen_local_scores}};
 
 // search aux
 const PLY_LIMIT: usize = 81;
-const INF: i16 = 16384;
-const LARGE: i16 = 8192;  // careful, it's used as |= MASK in search() for tpv
+const INF: i16 = 24576;
+const LARGE: i16 = 16384;  // careful, it's used as |= MASK in search() for tpv
 
-pub static LOCAL_SCORES: Lazy<(Box<[i16]>, Box<[i16]>)> = Lazy::new(|| {
-    let mut x = vec![0i16; 262144];
-    let mut o = vec![0i16; 262144];
+pub static LOCAL_SCORES: Lazy<(Box<[i8]>, Box<[i8]>)> = Lazy::new(|| {
+    let mut x = vec![0i8; 262144];
+    let mut o = vec![0i8; 262144];
     gen_local_scores(&mut x, &mut o);
     (x.into_boxed_slice(), o.into_boxed_slice())
 });
-// additional eval weights
-const FREE_MOVE_FACT: i16 = 9;
-static ANCHOR_WEIGHTS: [i16; 9] = [3, 2, 3, 2, 4, 2, 3, 2, 3];
 
 
 pub struct Engine {
@@ -162,98 +159,50 @@ impl Engine {
 /* Before calling this function, search MUST determine if the game already ended!
    legals - legal moves, eval takes in account (heuristically) number of moves available, and returns better score in case it's more than threshold
    it's made as a passable argument to avoid duplicate calculations */
-/* This eval is temporary.
-   I think I should apply weights depending on the possibilities of win (e.g. 1 open lane vs 3/4) */
 pub fn eval(board: &Board, legals: &u128) -> i16 {
-    return 0;
-    
     let mut score = 0;
 
-    // getting LOCAL_EVALS related + other stuff that needs loop over locals
-    let mut xpos: u16 = 0;
-    let mut opos: u16 = 0;
-    let mut scores = [0; 9];
+    // scores on the local boards, separated
+    let mut xscores = [0; 9];
+    let mut oscores = [0; 9];
+
+    // get local scores
     for i in 0u8..9 {
-        // it duplicates some lazy operations but it actually helps the bottleneck
-        if board.global[0].get_bit(i) != 0 {
-            xpos.set_bit(i);
-            scores[i as usize] = 30;  // LEVAL_WEIGHTS[lbs];
-            continue;
-        }
-        if board.global[1].get_bit(i) != 0 {
-            opos.set_bit(i);
-            scores[i as usize] = -30;  // LEVAL_WEIGHTS[lbs];
-            continue;
-        }
-        // don't check for global[2] (draw), because the real draw happens when there's no xpos and no opos
         let xs = (board.locals[0] & SUB_LOOKUP[i as usize]) >> (i * 9);
         let os = (board.locals[1] & SUB_LOOKUP[i as usize]) >> (i * 9);
         let lbs = xs as usize | (os << 9) as usize;
-        let mut draw_flg = true;
-        // if LEVAL_XPOS[lbs] {
-        //     xpos.set_bit(i);
-        //     draw_flg = false;
-        // }
-        // if LEVAL_OPOS[lbs] {
-        //     opos.set_bit(i);
-        //     draw_flg = false;
-        // }
-        // real draw check (may be avoided because LEVAL_WEIGHTS[lbs] returns 0, BUT needed if there are also other checks later)
-        if draw_flg {
-            continue;
-        }
-        // scores[i as usize] = LEVAL_WEIGHTS[lbs];
-        // applying KEY/ANCHOR CELLS (pre-sort optimization mostly) scores
-        // note that local board is overridden if it's won
-        if xs.get_bit(i) != 0 {  // && board.global[0].get_bit(i) == 0 {
-            score += ANCHOR_WEIGHTS[i as usize];
-        } else if os.get_bit(i) != 0 {  // && board.global[1].get_bit(i) == 0 {
-            score -= ANCHOR_WEIGHTS[i as usize];
-        }
+        xscores[i as usize] = LOCAL_SCORES.0[lbs];
+        oscores[i as usize] = LOCAL_SCORES.1[lbs];
     }
 
-    // applying LOCAL_EVALS scores
-    let (mut x1, mut x2, mut o1, mut o2) = (0, 0, 0, 0);
-    for lookup in WIN_LOOKUP.iter() {
-        if xpos & lookup == *lookup {
-            let mut cnt: i16 = 0;
-            let mut bits = *lookup;
-            while bits != 0 {
-                let bit = bits.pop_bit();
-                cnt += max(0, scores[bit as usize] as i16);
-            }
-            if cnt > x1 {
-                x2 = x1;
-                x1 = cnt;
-            } else if cnt > x2 {
-                x2 = cnt;
-            }
-        }
-        if opos & lookup == *lookup {
-            let mut cnt: i16 = 0;
-            let mut bits = *lookup;
-            while bits != 0 {
-                let bit = bits.pop_bit();
-                cnt += min(0, scores[bit as usize] as i16);
-            }
-            if cnt < o1 {
-                o2 = o1;
-                o1 = cnt;
-            } else if cnt < o2 {
-                o2 = cnt;
-            }
-        }
-    }
-    score += x1 * 10 + x2 + o1 * 10 + o2;
+    // line scores
+    let mut xlines = [0; 8];
+    let mut olines = [0; 8];
 
-    // applying move count heuristic
-    if legals.count_ones() > 9 {
-        if board.turn {
-            score -= FREE_MOVE_FACT;
-        } else{
-            score += FREE_MOVE_FACT;
+    // convert local scores to line scores
+    for (i, lookup) in WIN_LOOKUP.iter().enumerate() {
+        let mut xcnt: i16 = 1;
+        let mut ocnt: i16 = 1;
+        let mut bits = *lookup;
+        while bits != 0 {
+            let bit = bits.pop_bit();
+            xcnt *= xscores[bit as usize] as i16;
+            ocnt *= oscores[bit as usize] as i16;
         }
+        xlines[i] = xcnt;
+        olines[i] = ocnt;
     }
+
+    xlines.sort();
+    xlines.reverse();
+    olines.sort();
+    olines.reverse();
+
+    // with MAX_LOCAL_SCORE = 20 theorietically (im)possible upperbound is (20^3) * 1.9375, and 15500 still less than LARGE = 16384, which is first bit of i16
+    score += xlines[0] + xlines[1] / 2 + xlines[2] / 4 + xlines[3] / 8 + xlines[4] / 16;
+    score -= olines[0] + olines[1] / 2 + olines[2] / 4 + olines[3] / 8 + olines[4] / 16;
+
+    // there could be an additional weight if free move, feel lazy to implement
 
     score
 }
