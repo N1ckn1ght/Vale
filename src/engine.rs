@@ -1,6 +1,7 @@
-use std::{cmp::{Reverse, max, min}, time::Instant};
+use std::{cmp::{max, Reverse}, time::Instant};
 use once_cell::sync::Lazy;
-use crate::{bitboard::{GetBit, PopBit, SetBit}, board::Board, lookups::{SUB_LOOKUP, WIN_LOOKUP}, weights::{MAX_LOCAL_SCORE, gen_local_scores}};
+use crate::{bitboard::PopBit, board::Board, lookups::{DIV_LOOKUP, MOD_LOOKUP, SUB_LOOKUP, WIN_LOOKUP}, weights::gen_local_scores};
+
 
 // search aux
 const PLY_LIMIT: usize = 81;
@@ -56,10 +57,9 @@ impl Engine {
     }
 
     // pass board clone
-    pub fn think(
+    pub fn search(
         &mut self,
         board: &mut Board,
-        aspiration_window: i32,
         time_limit_ms: u128,
         depth_limit: i8
     ) {
@@ -97,13 +97,7 @@ impl Engine {
         }
     }
 
-    pub fn search(
-        &mut self,
-        board: &mut Board,
-        mut alpha: i16,
-        beta: i16,
-        mut depth: i16
-    ) -> i16 {
+    pub fn negamax(&mut self, mut board: &mut Board, mut alpha: i16, beta: i16, mut depth: i16) -> i16 {
         self.nodes += 1;
         self.tpv_len[self.ply] = self.ply;
 
@@ -116,50 +110,73 @@ impl Engine {
         let mut legals = board.generate_legal_moves();
 
         if depth == 0 || self.ply > PLY_LIMIT {
-            return eval(&board, &legals);
+            return eval(&board);
         }
 
+        let mut score = -INF;
+        // pre-sort on eval when it makes sense, so if depth > 1
         if depth > 1 {
             let mut presort: Vec<(u8, i16)> = Vec::with_capacity(legals.count_ones() as usize);
-            let mut lcopy = legals;
             while legals != 0 {
                 let bit = legals.pop_bit();
                 board.make_move(bit);
-                let mut score = eval(board, &board.generate_legal_moves());
+                let mut score = eval(board);
                 board.undo_move();
                 if board.turn {
                     score = -score;
                 }
-                // principal variation goes first
+                
                 if bit == self.tpv[0][self.ply] {
+                    // principal variation goes first
                     score |= LARGE;
+                } else if DIV_LOOKUP[bit as usize] == MOD_LOOKUP[bit as usize] {
+                    // "anchor" move should be looked into as well (the bit is not guaranteed to be empty)
+                    score |= LARGE >> 1;
+                } else if !board.moves.is_empty() && DIV_LOOKUP[*board.moves.last().unwrap() as usize] == MOD_LOOKUP[bit as usize] {
+                    // move that sends opponent into Zugswang should be looked into as well (the bit is not guaranteed to be emtpy)
+                    score |= LARGE >> 1;
                 }
                 presort.push((bit, score));
             }
             presort.sort_by_key(|&(_, score)| Reverse(score));
 
             for (i, (mov, _)) in presort.iter().enumerate() {
-                
+                board.make_move(*mov);
+                let next_d = if depth < 3 || i < 4 {
+                    depth - 1
+                } else if i < 6 {
+                    depth - 2
+                } else {
+                    depth / 2
+                };
+                score = max(score, -self.negamax(&mut board, -beta, -alpha, next_d));
+                board.undo_move();
+
+                alpha = max(alpha, score);
+                if alpha >= beta {
+                    return beta;  // fail high, opponent will not choose the branch led to this move
+                }
             }
         } else {
             while legals != 0 {
                 let bit = legals.pop_bit();
                 board.make_move(bit);
-                
+                score = max(score, -self.negamax(&mut board, -beta, -alpha, depth - 1));
                 board.undo_move();
+
+                alpha = max(alpha, score);
+                if alpha >= beta {
+                    return beta;  // fail high, opponent will not choose the branch led to this move
+                }
             }
         }
-        // pre-sort?
-        
 
-        0
+        score
     }
 }
 
-/* Before calling this function, search MUST determine if the game already ended!
-   legals - legal moves, eval takes in account (heuristically) number of moves available, and returns better score in case it's more than threshold
-   it's made as a passable argument to avoid duplicate calculations */
-pub fn eval(board: &Board, legals: &u128) -> i16 {
+// Before calling this function, search MUST determine if the game already ended!
+pub fn eval(board: &Board) -> i16 {
     let mut score = 0;
 
     // scores on the local boards, separated
@@ -215,68 +232,89 @@ mod tests {
 
     #[test]
     fn eval_common_sense() {
-        // don't change this test unless you're 100% know what you're doing
+        // don't change this test unless you're absolutely sure you know what you're doing
         let mut board = Board::default();
+
         board.import_ken("xx1xox1xx-o8-9-o8-9-o8-9-o8-o8 b2");
-        assert!(eval(&board, &board.generate_legal_moves()) < 0);
+        assert!(eval(&board) < 0);
         board.import_ken("xx1x1xoxx-o8-9-o8-9-o8-9-o8-o8 a3");
-        assert!(eval(&board, &board.generate_legal_moves()) < 0);
+        assert!(eval(&board) < 0);
         board.import_ken("xxox1x1xx-o8-9-o8-9-o8-9-o8-o8 c1");
-        assert!(eval(&board, &board.generate_legal_moves()) < 0);
+        assert!(eval(&board) < 0);
         board.import_ken("9-9-9-9-4x4-9-9-9-9 e5");
-        assert!(eval(&board, &board.generate_legal_moves()) > 0);
+        assert!(eval(&board) > 0);
 
         board.import_history("1. e5 d6 2. a9 c7 3. i1 g3 4. a8 a5 5. c5 i5 6. g5 a6 7. a7 a1 8. b1 e1 9. e3 e9 10. d7 b2 11. d4 c3 12. i9 g8 13. c6 i8 14. g4 f6 15. g7 h8 16. e4 f1 17. h1 d1 18. e6");
         let legals = board.generate_legal_moves();
-        let eval0 = eval(&board, &legals);
+        let eval0 = eval(&board);
         assert!(eval0 > 0);
 
         board.make_move(transform_move("d9", legals));
-        let eval1 = eval(&board, &legals);
+        let eval1 = eval(&board);
         assert!(eval0 <= eval1);
         board.undo_move();
 
         board.make_move(transform_move("f9", legals));
-        let eval2 = eval(&board, &legals);
+        let eval2 = eval(&board);
         assert!(eval0 <= eval2);
         board.undo_move();
 
         board.make_move(transform_move("e8", legals));
-        let eval3 = eval(&board, &legals);
+        let eval3 = eval(&board);
         assert!(eval0 <= eval3);
         board.undo_move();
 
         board.make_move(transform_move("e7", legals));
-        let eval4 = eval(&board, &legals);
+        let eval4 = eval(&board);
         assert!(eval0 <= eval4);
         board.undo_move();
 
         board.make_move(transform_move("d8", legals));
-        let eval5 = eval(&board, &legals);
+        let eval5 = eval(&board);
         assert!(eval5 <= eval1 && eval5 <= eval2 && eval5 <= eval3 && eval5 <= eval4);
     }
 
     #[test]
-    fn eval_limits() {
+    fn eval_basic() {
+        // may depend on how you implement weights
         let mut board = Board::default();
-        board.import_ken("xx1xxx1xx-1xxx1xxx1-xx1x1x1xx-1xxx1xxx1-xx1x1x1xx-1xxx1xxx1-xx1x1x1xx-1xxx1xxx1-xx1xxx1xx -");
-        let ev1 = eval(&board, &board.generate_legal_moves());
-        assert!(ev1 > 0);
-        assert!(ev1 < LARGE);
-        board.import_ken("xx1xxx1xx-1xxxxxxx1-xx1x1x1xx-1xxxxxxx1-xx1x1x1xx-1xxxxxxx1-xx1x1x1xx-1xxxxxxx1-xx1xxx1xx -");
-        assert!(eval(&board, &board.generate_legal_moves()) > 0);
-        assert!(eval(&board, &board.generate_legal_moves()) < LARGE);
-        assert!(eval(&board, &board.generate_legal_moves()) > ev1);
 
-        let mut board = Board::default();
-        board.import_ken("oo1o1o1oo-1ooo1ooo1-oo1o1o1oo-1ooo1ooo1-oo1ooo1oo-1ooo1ooo1-oo1o1o1oo-1ooo1ooo1-oo1o1o1oo -");
-        assert!(eval(&board, &board.generate_legal_moves()) < 0);
-        assert!(eval(&board, &board.generate_legal_moves()) > -LARGE);
+        board.import_ken("x8-9-9-9-9-9-9-9-9 a1");
+        let eval10 = eval(&board);
+        board.import_ken("xx7-o8-9-9-9-9-9-9-9 a1");
+        assert!(eval(&board) > eval10);
+
+        board.import_ken("o8-9-9-9-9-9-9-9-9 a1");
+        let eval11 = eval(&board);
+        board.import_ken("oo7-x8-9-9-9-9-9-9-9 a1");
+        let eval12 = eval(&board);
+        assert!(eval12 < eval11);
+
+        board.import_ken("oo1oo4-9-9-9-9-9-9-9-9");
+        let eval13 = eval(&board);
+        assert!(eval13 > eval12);  // not a mistake 
+        board.import_ken("oo7-9-9-9-9-9-9-9-9");
+        let eval14 = eval(&board);
+        assert!(eval13 > eval14);  // not a mistake 
     }
 
     #[test]
-    fn eval_specific() {
-        // change this test with every change of eval()
+    fn eval_limits() {
+        // if this test fails, it's bad for the search function
+        let mut board = Board::default();
 
+        board.import_ken("xx1xxx1xx-1xxx1xxx1-xx1x1x1xx-1xxx1xxx1-xx1x1x1xx-1xxx1xxx1-xx1x1x1xx-1xxx1xxx1-xx1xxx1xx -");
+        let ev1 = eval(&board);
+        assert!(ev1 > 0);
+        assert!(ev1 < LARGE);
+        board.import_ken("xx1xxx1xx-1xxxxxxx1-xx1x1x1xx-1xxxxxxx1-xx1x1x1xx-1xxxxxxx1-xx1x1x1xx-1xxxxxxx1-xx1xxx1xx -");
+        assert!(eval(&board) > 0);
+        assert!(eval(&board) < LARGE);
+        assert!(eval(&board) > ev1);
+
+        let mut board = Board::default();
+        board.import_ken("oo1o1o1oo-1ooo1ooo1-oo1o1o1oo-1ooo1ooo1-oo1ooo1oo-1ooo1ooo1-oo1o1o1oo-1ooo1ooo1-oo1o1o1oo -");
+        assert!(eval(&board) < 0);
+        assert!(eval(&board) > -LARGE);
     }
 }

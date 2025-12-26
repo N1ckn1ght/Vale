@@ -10,6 +10,7 @@ pub fn user_box() {
     let mut show_bestline = false;
     let mut show_history = true;
     let mut show_ken = true;
+    let mut eval_as_is = false;
 
     loop {
         // print current status
@@ -85,14 +86,32 @@ pub fn user_box() {
                     }
                 },
                 "eval" => {
-                    let depth = cmd[1].parse::<u8>().unwrap();
-                    let score = if depth != 0 {
-                        // TODO
-                        "TODO".to_string()
+                    if cmd.len() > 1 {
+                        if cmd[1].contains('s') {
+                            eval_as_is = !eval_as_is;
+                            if eval_as_is {
+                                println!("Eval will be printed as is.");
+                            } else {
+                                println!("Eval will be printed in similar to chess manner and values.");
+                            }
+                        } else {
+                            let depth = cmd[1].parse::<u8>().unwrap();
+                            let ev = eval(&board);
+                            let score = if depth != 0 {
+                                // TODO
+                                "TODO".to_string()
+                            } else {
+                                format_eval(ev)
+                            };
+                            if eval_as_is {
+                                println!("Score (depth {depth}): {}", ev);
+                            } else {
+                                println!("Score (depth {depth}): {}", score);
+                            }
+                        }
                     } else {
-                        format_eval(eval(&board, &legals))
-                    };
-                    println!("Score (depth {depth}): {}", score);
+                        println!("Specify params. Maybe you want 'eval 1', 'eval 0' or 'eval switch'?");
+                    }
                 },
                 "history" => {
                     show_history = !show_history;
@@ -162,7 +181,8 @@ pub fn user_box() {
                     println!("undo           - undo last move");
                     println!("engine 10      - ask engine to make move (depth in half-moves, 1-81, rec. max. 10)");
                     println!("bestline       - show/hide proposed bestline by engine after engine/eval calls");
-                    println!("eval 0         - evaluate position (depth in half-moves, 0-81, rec. max. 8, 0 won't show any line)");
+                    println!("eval 1         - evaluate position (depth in half-moves, 0-81, rec. max. 8, 0 won't show any line)");
+                    println!("eval switch    - switch between printing chess-like score format and printing eval as is");
                     println!("history        - hide/show move history after each move");
                     println!("ken            - hide/show Kochergin-Efimov Notation after each move");
                     println!("movegen        - show/hide movegen string after each move");
@@ -269,11 +289,9 @@ fn grb(rank: u8, file: u8) -> u8 {
 }
 
 fn format_eval(eval: i16) -> String {
-    if eval == 0 {
-        return "0".to_string();
-    }
-    let sign = if eval > 0 {"+"} else {"-"};
-    let abs = eval.abs();
+    let sign = if eval > 0 {"+"} else if eval < 0 {"-"} else {""};
+    let mut abs = eval.abs();
+    abs /= 6;  // make it similar to chess for human players to look at?
     let fpart = abs / 100;
     let spart = abs % 100;
     format!("{}{}.{:02}", sign, fpart, spart)
