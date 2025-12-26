@@ -1,5 +1,5 @@
 use std::io::stdin;
-use crate::{bitboard::GetBit, board::{transform_move, Board, ERR_MOV}, engine::eval, lookups::DIV_LOOKUP};
+use crate::{bitboard::GetBit, board::{transform_move, Board, ERR_MOV}, engine::{eval, Engine}, lookups::DIV_LOOKUP};
 
 
 pub fn user_box() {
@@ -11,6 +11,8 @@ pub fn user_box() {
     let mut show_history = true;
     let mut show_ken = true;
     let mut eval_as_is = false;
+
+    let mut engine = Engine::default();
 
     loop {
         // print current status
@@ -96,16 +98,20 @@ pub fn user_box() {
                             }
                         } else {
                             let depth = cmd[1].parse::<u8>().unwrap();
-                            let ev = eval(&board);
-                            let score = if depth != 0 {
-                                // TODO
-                                "TODO".to_string()
+                            let mut ev = 0;
+                            let mut bm = ERR_MOV;
+
+                            if depth != 0 {
+                                (bm, ev) = engine.search(&mut board, None, Some(depth as usize));
+                                println!("\t\t\t\tdebug bm: {}", bm);
                             } else {
-                                format_eval(ev)
-                            };
+                                ev = eval(&board);
+                            }
+
                             if eval_as_is {
                                 println!("Score (depth {depth}): {}", ev);
                             } else {
+                                let score = format_eval(ev);
                                 println!("Score (depth {depth}): {}", score);
                             }
                         }
@@ -288,7 +294,7 @@ fn grb(rank: u8, file: u8) -> u8 {
     (rank / 3) * 27 + (rank % 3) * 3 + (file / 3) * 9 + (file % 3)
 }
 
-fn format_eval(eval: i16) -> String {
+pub fn format_eval(eval: i16) -> String {
     let sign = if eval > 0 {"+"} else if eval < 0 {"-"} else {""};
     let mut abs = eval.abs();
     abs /= 6;  // make it similar to chess for human players to look at?

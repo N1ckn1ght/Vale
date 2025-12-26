@@ -1,6 +1,6 @@
-use std::{cmp::{max, Reverse}, time::Instant};
+use std::{cmp::{max, min, Reverse}, time::Instant};
 use once_cell::sync::Lazy;
-use crate::{bitboard::PopBit, board::Board, lookups::{DIV_LOOKUP, MOD_LOOKUP, SUB_LOOKUP, WIN_LOOKUP}, weights::gen_local_scores};
+use crate::{bitboard::PopBit, board::{transform_move_back, Board}, interface::format_eval, lookups::{DIV_LOOKUP, MOD_LOOKUP, SUB_LOOKUP, WIN_LOOKUP}, weights::gen_local_scores};
 
 
 // search aux
@@ -27,7 +27,7 @@ pub struct Engine {
     tpv:      [[u8; PLY_LIMIT]; PLY_LIMIT],  // triangular table of a principal variation
     tpv_len:  [usize; PLY_LIMIT],            // current length of tpv
     tpv_flag: bool,                          // is this variation the principle one
-    cur_ply:  i8,                            // current depth
+    td:       i8                             // current target depth
 }
 
 impl Default for Engine {
@@ -42,7 +42,7 @@ impl Default for Engine {
             tpv: [[0; PLY_LIMIT]; PLY_LIMIT],
             tpv_len: [0; PLY_LIMIT],
             tpv_flag: false,
-            cur_ply: 0
+            td: 0
         }
     }
 }
@@ -59,14 +59,16 @@ impl Engine {
     // pass board clone
     pub fn search(
         &mut self,
-        board: &mut Board,
-        time_limit_ms: u128,
-        depth_limit: i8
-    ) {
+        mut board: &mut Board,
+        time_limit_ms: Option<u128>,
+        depth_limit: Option<usize>
+    ) -> (u8, i16) {
         self.ts = Instant::now();
-        self.tl = time_limit_ms;
+        self.tl = time_limit_ms.unwrap_or(31_536_000_000);
+        let dl = max(min(depth_limit.unwrap_or(PLY_LIMIT), PLY_LIMIT), 1) as i8;
         self.abort = false;
-        
+        self.nodes = 0;
+
         for line in self.tpv.iter_mut() {
             for node in line.iter_mut() {
                 *node = 0;
@@ -75,29 +77,33 @@ impl Engine {
         for len in self.tpv_len.iter_mut() {
             *len = 0;
         }
-        
-        let mut alpha = -INF;
-        let mut beta  =  INF;
+
+        let alpha = -INF;
+        let beta  =  INF;
         let mut score =  0;
-        let mut delta =  1;
-        self.cur_ply = 1;
-        let legals = board.generate_legal_moves();
-        
+        self.td = 1;
+
         loop {
             self.tpv_flag = true;
-            // let temp = self.search(alpha, beta, self.cur_depth);
+            let temp = self.negamax(&mut board, alpha, beta, self.td);
             if !self.abort {
-                // score = temp;
+                score = temp;
             } else {
-                println!()
+                println!("#DEBUG\tAbort signal reached.");
+                break;
             }
-            
+            self.post(&format_eval(score));
 
-            break;
+            self.td += 1;
+            if self.td > dl || self.ts.elapsed().as_millis() > self.tl {
+                break;
+            }
         }
+
+        (self.tpv[0][0], score)
     }
 
-    pub fn negamax(&mut self, mut board: &mut Board, mut alpha: i16, beta: i16, mut depth: i16) -> i16 {
+    pub fn negamax(&mut self, mut board: &mut Board, mut alpha: i16, beta: i16, mut depth: i8) -> i16 {
         self.nodes += 1;
         self.tpv_len[self.ply] = self.ply;
 
@@ -141,6 +147,7 @@ impl Engine {
             presort.sort_by_key(|&(_, score)| Reverse(score));
 
             for (i, (mov, _)) in presort.iter().enumerate() {
+                self.ply += 1;
                 board.make_move(*mov);
                 let next_d = if depth < 3 || i < 4 {
                     depth - 1
@@ -151,6 +158,7 @@ impl Engine {
                 };
                 score = max(score, -self.negamax(&mut board, -beta, -alpha, next_d));
                 board.undo_move();
+                self.ply -= 1;
 
                 alpha = max(alpha, score);
                 if alpha >= beta {
@@ -160,9 +168,16 @@ impl Engine {
         } else {
             while legals != 0 {
                 let bit = legals.pop_bit();
+
+                self.ply += 1;
                 board.make_move(bit);
                 score = max(score, -self.negamax(&mut board, -beta, -alpha, depth - 1));
                 board.undo_move();
+                self.ply -= 1;
+
+                if self.abort {
+                    return 0;  // time limit exceed
+                }
 
                 alpha = max(alpha, score);
                 if alpha >= beta {
@@ -172,6 +187,15 @@ impl Engine {
         }
 
         score
+    }
+
+    pub fn post(&self, score_to_post: &str) {
+        // if !self.do_post or something
+        print!("{} {} {} {}", self.td, score_to_post, self.ts.elapsed().as_millis() / 10, self.nodes);
+        for (_, mov) in self.tpv[0].iter().enumerate().take(max(self.tpv_len[0], 1)) {
+            print!(" {}", transform_move_back(*mov));
+        }
+        println!();
     }
 }
 
