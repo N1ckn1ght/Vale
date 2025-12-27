@@ -40,11 +40,11 @@ pub fn gen_local_scores(xscores: &mut [i8], oscores: &mut [i8]) {
         // heuristic
         if xbits.count_ones() > 3 && obits.count_ones() == 0 {
             xscores[permut] = POS_SCORE[3][1];
-            oscores[permut] = POS_SCORE[3][8];
+            oscores[permut] = POS_SCORE[3][((ol >> POS_CNT[3]) & POS_MASK) as usize];
             continue;
         }
         if obits.count_ones() > 3 && xbits.count_ones() == 0 {
-            xscores[permut] = POS_SCORE[3][8];
+            xscores[permut] = POS_SCORE[3][((xl >> POS_CNT[3]) & POS_MASK) as usize];
             oscores[permut] = POS_SCORE[3][1];
             continue;
         }
@@ -92,7 +92,7 @@ mod tests {
         assert_eq!(os[t4], MAX_LOCAL_SCORE);  // ol[t4].get_bit(POS_CNT[0]) != 0
 
         let t5 = 0b_000000000_110101011;
-        assert_eq!(xs[t5], 11);
+        assert_eq!(xs[t5], 1);
         assert_eq!(os[t5], 1);
 
         let t6 = 0b_000000000_101000100;

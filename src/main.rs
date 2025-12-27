@@ -15,6 +15,7 @@ fn main() {
     let _ = &LOCAL_SCORES.0;
     let _ = &LOCAL_SCORES.1;
     println!("# Force init completed.");
+    println!("\n\n\n\n\n\n\n");
 
     // perft(8);
     // println!("(results are a bit skewed because of user_box right after perft idk)\n");
