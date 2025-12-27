@@ -37,6 +37,18 @@ pub fn gen_local_scores(xscores: &mut [i8], oscores: &mut [i8]) {
             continue;
         }
 
+        // heuristic
+        if xbits.count_ones() > 3 && obits.count_ones() == 0 {
+            xscores[permut] = POS_SCORE[3][1];
+            oscores[permut] = POS_SCORE[3][8];
+            continue;
+        }
+        if obits.count_ones() > 3 && xbits.count_ones() == 0 {
+            xscores[permut] = POS_SCORE[3][8];
+            oscores[permut] = POS_SCORE[3][1];
+            continue;
+        }
+
         xscores[permut] = min(
             POS_SCORE[1][((xl >> POS_CNT[1]) & POS_MASK) as usize] +
             POS_SCORE[2][((xl >> POS_CNT[2]) & POS_MASK) as usize] +

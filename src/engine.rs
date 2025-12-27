@@ -125,50 +125,62 @@ impl Engine {
             return eval(&board);
         }
 
-        let mut score = -INF;
         // pre-sort on eval when it makes sense, so if depth > 1
         if depth > 1 {
             let total_moves = legals.count_ones();
             let mut deep_moves = 2;
+            let mut zugs = 0;
             let mut presort: Vec<(u8, i16)> = Vec::with_capacity(total_moves as usize);
             while legals != 0 {
                 let bit = legals.pop_bit();
                 board.make_move(bit);
-                let mut score = eval(board);
+                let mut bscore = eval(board);
                 board.undo_move();
                 
                 if bit == self.tpv[0][self.ply] {
                     // principal variation goes first
-                    score += LARGE;
+                    bscore += LARGE;
                     deep_moves += 1;
                 } else if DIV_LOOKUP[bit as usize] == MOD_LOOKUP[bit as usize] {
                     // "anchor" move should be looked into as well (the bit is not guaranteed to be empty)
-                    score += LARGE >> 1;
+                    bscore += LARGE >> 2;
                     deep_moves += 1;
                 } else if !board.moves.is_empty() {  // && DIV_LOOKUP[*board.moves.last().unwrap() as usize] == MOD_LOOKUP[bit as usize] {
                     let gbit = DIV_LOOKUP[*board.moves.last().unwrap() as usize];
                     if gbit == MOD_LOOKUP[bit as usize] && board.global[0].get_bit(gbit) == 0 && board.global[1].get_bit(gbit) == 0 && board.global[2].get_bit(gbit) == 0 {
                         // move that sends opponent into Zugswang should be looked into as well (the bit is not guaranteed to be emtpy)
-                        score += LARGE >> 1;
+                        bscore += LARGE >> 1;
                         deep_moves += 1;
+                        zugs += 1;
                     }
                 }
-                presort.push((bit, score));
+                presort.push((bit, bscore));
             }
             presort.sort_by_key(|&(_, score)| Reverse(score));
+
+            if zugs > 2 {
+                deep_moves -= 1;
+            }
 
             for (i, (mov, _)) in presort.iter().enumerate() {
                 self.ply += 1;
                 board.make_move(*mov);
-                // let next_d = depth - 1;
-                let next_d = if depth < 3 || i < deep_moves {
-                    depth - 1
+
+                let mut score = if depth < 3 || i < deep_moves {
+                    alpha + 1  // force recheck as if LMR failed
                 } else if i < (deep_moves + 2) {
-                    depth - 2
+                    -self.negamax(&mut board, -beta, -alpha, depth - 2)
                 } else {
-                    depth - 2 - (depth > 3) as i8
+                    -self.negamax(&mut board, -beta, -alpha, depth - 2 - (depth > 3) as i8 - ((depth > 4) && (i > 18)) as i8)
                 };
-                score = max(score, -self.negamax(&mut board, -beta, -alpha, next_d));
+
+                if score > alpha {
+                    score = -self.negamax(&mut board, -alpha - 1, -alpha, depth - 1);
+                    if score > alpha && score < beta {
+                        score = -self.negamax(&mut board, -beta, -alpha, depth - 1);
+                    }
+                }
+
                 board.undo_move();
                 self.ply -= 1;
 
@@ -198,7 +210,9 @@ impl Engine {
 
                 self.ply += 1;
                 board.make_move(bit);
-                score = max(score, -self.negamax(&mut board, -beta, -alpha, depth - 1));
+
+                let score = -self.negamax(&mut board, -beta, -alpha, depth - 1);
+
                 board.undo_move();
                 self.ply -= 1;
 
@@ -224,7 +238,7 @@ impl Engine {
             }
         }
 
-        score
+        alpha  // fail low, we won't choose the branch led to this move
     }
 
     pub fn post(&self, score_to_post: &str) {
