@@ -1,12 +1,12 @@
 use std::{cmp::{max, min, Reverse}, time::Instant};
 use once_cell::sync::Lazy;
-use crate::{bitboard::PopBit, board::{transform_move_back, Board}, interface::format_eval, lookups::{DIV_LOOKUP, MOD_LOOKUP, SUB_LOOKUP, WIN_LOOKUP}, weights::gen_local_scores};
+use crate::{bitboard::PopBit, board::{Board, transform_move, transform_move_back}, interface::format_eval, lookups::{DIV_LOOKUP, MOD_LOOKUP, SUB_LOOKUP, WIN_LOOKUP}, weights::gen_local_scores};
 
 
 // search aux
 const PLY_LIMIT: usize = 81;
 const INF: i16 = 24576;
-const LARGE: i16 = 16384;  // careful, it's used as |= MASK in search() for tpv
+const LARGE: i16 = 16384;
 
 pub static LOCAL_SCORES: Lazy<(Box<[i8]>, Box<[i8]>)> = Lazy::new(|| {
     let mut x = vec![0i8; 262144];
@@ -85,9 +85,12 @@ impl Engine {
 
         loop {
             self.tpv_flag = true;
-            let temp = self.negamax(&mut board, alpha, beta, self.td);
+            let temp = -self.negamax(&mut board, alpha, beta, self.td);
             if !self.abort {
                 score = temp;
+                if board.turn {
+                    score = -score;  // maybe should be not there?
+                }
             } else {
                 println!("#DEBUG\tAbort signal reached.");
                 break;
@@ -116,31 +119,40 @@ impl Engine {
         let mut legals = board.generate_legal_moves();
 
         if depth == 0 || self.ply > PLY_LIMIT {
+            if board.turn {
+                return -eval(&board);
+            }
             return eval(&board);
         }
 
         let mut score = -INF;
         // pre-sort on eval when it makes sense, so if depth > 1
         if depth > 1 {
-            let mut presort: Vec<(u8, i16)> = Vec::with_capacity(legals.count_ones() as usize);
+            let total_moves = legals.count_ones();
+            let mut add_deep_moves = 2;
+            let mut presort: Vec<(u8, i16)> = Vec::with_capacity(total_moves as usize);
             while legals != 0 {
                 let bit = legals.pop_bit();
                 board.make_move(bit);
                 let mut score = eval(board);
                 board.undo_move();
-                if board.turn {
-                    score = -score;
-                }
                 
+                // println!("{} {} {}", bit, transform_move_back(bit), score);
                 if bit == self.tpv[0][self.ply] {
                     // principal variation goes first
-                    score |= LARGE;
-                } else if DIV_LOOKUP[bit as usize] == MOD_LOOKUP[bit as usize] {
+                    score += LARGE;
+                    add_deep_moves += 1;
+                    // println!("tpv {}", score);
+                } else if total_moves > 9 && DIV_LOOKUP[    bit as usize] == MOD_LOOKUP[bit as usize] {
                     // "anchor" move should be looked into as well (the bit is not guaranteed to be empty)
-                    score |= LARGE >> 1;
+                    score += LARGE >> 1;
+                    add_deep_moves += 1;
+                    // println!("anchor {}", score);
                 } else if !board.moves.is_empty() && DIV_LOOKUP[*board.moves.last().unwrap() as usize] == MOD_LOOKUP[bit as usize] {
                     // move that sends opponent into Zugswang should be looked into as well (the bit is not guaranteed to be emtpy)
-                    score |= LARGE >> 1;
+                    score += LARGE >> 1;
+                    add_deep_moves += 1;
+                    // println!("back {}", score);
                 }
                 presort.push((bit, score));
             }
@@ -149,20 +161,36 @@ impl Engine {
             for (i, (mov, _)) in presort.iter().enumerate() {
                 self.ply += 1;
                 board.make_move(*mov);
-                let next_d = if depth < 3 || i < 4 {
-                    depth - 1
-                } else if i < 6 {
-                    depth - 2
-                } else {
-                    depth / 2
-                };
+                let next_d = depth - 1;
+                // let next_d = if depth < 3 || i < add_deep_moves {
+                //     depth - 1
+                // } else if i < (add_deep_moves + 2) {
+                //     depth - 2
+                // } else {
+                //     depth / 2
+                // };
                 score = max(score, -self.negamax(&mut board, -beta, -alpha, next_d));
                 board.undo_move();
                 self.ply -= 1;
 
-                alpha = max(alpha, score);
-                if alpha >= beta {
-                    return beta;  // fail high, opponent will not choose the branch led to this move
+                if self.abort {
+                    return 0;  // time limit exceed
+                }
+
+                if score > alpha {
+                    alpha = score;
+
+                    self.tpv[self.ply][self.ply] = *mov;
+                    let mut next = self.ply + 1;
+                    while next < self.tpv_len[self.ply + 1] {
+                        self.tpv[self.ply][next] = self.tpv[self.ply + 1][next];
+                        next += 1;
+                    }
+                    self.tpv_len[self.ply] = self.tpv_len[self.ply + 1];
+
+                    if alpha >= beta {
+                        return beta;  // fail high, opponent will not choose the branch led to this move
+                    }
                 }
             }
         } else {
@@ -179,9 +207,20 @@ impl Engine {
                     return 0;  // time limit exceed
                 }
 
-                alpha = max(alpha, score);
-                if alpha >= beta {
-                    return beta;  // fail high, opponent will not choose the branch led to this move
+                if score > alpha {
+                    alpha = score;
+
+                    self.tpv[self.ply][self.ply] = bit;
+                    let mut next = self.ply + 1;
+                    while next < self.tpv_len[self.ply + 1] {
+                        self.tpv[self.ply][next] = self.tpv[self.ply + 1][next];
+                        next += 1;
+                    }
+                    self.tpv_len[self.ply] = self.tpv_len[self.ply + 1];
+
+                    if alpha >= beta {
+                        return beta;  // fail high, opponent will not choose the branch led to this move
+                    }
                 }
             }
         }
@@ -202,6 +241,8 @@ impl Engine {
 // Before calling this function, search MUST determine if the game already ended!
 pub fn eval(board: &Board) -> i16 {
     let mut score = 0;
+    // let ally = board.turn as usize;
+    // let enemy = !board.turn as usize;
 
     // scores on the local boards, separated
     let mut xscores = [0; 9];
