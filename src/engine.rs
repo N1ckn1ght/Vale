@@ -1,6 +1,6 @@
 use std::{cmp::{max, min, Reverse}, time::Instant};
 use once_cell::sync::Lazy;
-use crate::{bitboard::PopBit, board::{Board, transform_move, transform_move_back}, interface::format_eval, lookups::{DIV_LOOKUP, MOD_LOOKUP, SUB_LOOKUP, WIN_LOOKUP}, weights::gen_local_scores};
+use crate::{bitboard::{GetBit, PopBit}, board::{Board, transform_move, transform_move_back}, interface::format_eval, lookups::{DIV_LOOKUP, MOD_LOOKUP, SUB_LOOKUP, WIN_LOOKUP}, weights::gen_local_scores};
 
 
 // search aux
@@ -81,11 +81,11 @@ impl Engine {
         let alpha = -INF;
         let beta  =  INF;
         let mut score =  0;
-        self.td = 1;
+        self.td = 2;
 
         loop {
             self.tpv_flag = true;
-            let temp = -self.negamax(&mut board, alpha, beta, self.td);
+            let temp = self.negamax(&mut board, alpha, beta, self.td);
             if !self.abort {
                 score = temp;
                 if board.turn {
@@ -97,7 +97,7 @@ impl Engine {
             }
             self.post(&format_eval(score));
 
-            self.td += 1;
+            self.td += 2;
             if self.td > dl || self.ts.elapsed().as_millis() > self.tl {
                 break;
             }
@@ -129,7 +129,7 @@ impl Engine {
         // pre-sort on eval when it makes sense, so if depth > 1
         if depth > 1 {
             let total_moves = legals.count_ones();
-            let mut add_deep_moves = 2;
+            let mut deep_moves = 2;
             let mut presort: Vec<(u8, i16)> = Vec::with_capacity(total_moves as usize);
             while legals != 0 {
                 let bit = legals.pop_bit();
@@ -137,22 +137,21 @@ impl Engine {
                 let mut score = eval(board);
                 board.undo_move();
                 
-                // println!("{} {} {}", bit, transform_move_back(bit), score);
                 if bit == self.tpv[0][self.ply] {
                     // principal variation goes first
                     score += LARGE;
-                    add_deep_moves += 1;
-                    // println!("tpv {}", score);
-                } else if total_moves > 9 && DIV_LOOKUP[    bit as usize] == MOD_LOOKUP[bit as usize] {
+                    deep_moves += 1;
+                } else if DIV_LOOKUP[bit as usize] == MOD_LOOKUP[bit as usize] {
                     // "anchor" move should be looked into as well (the bit is not guaranteed to be empty)
                     score += LARGE >> 1;
-                    add_deep_moves += 1;
-                    // println!("anchor {}", score);
-                } else if !board.moves.is_empty() && DIV_LOOKUP[*board.moves.last().unwrap() as usize] == MOD_LOOKUP[bit as usize] {
-                    // move that sends opponent into Zugswang should be looked into as well (the bit is not guaranteed to be emtpy)
-                    score += LARGE >> 1;
-                    add_deep_moves += 1;
-                    // println!("back {}", score);
+                    deep_moves += 1;
+                } else if !board.moves.is_empty() {  // && DIV_LOOKUP[*board.moves.last().unwrap() as usize] == MOD_LOOKUP[bit as usize] {
+                    let gbit = DIV_LOOKUP[*board.moves.last().unwrap() as usize];
+                    if gbit == MOD_LOOKUP[bit as usize] && board.global[0].get_bit(gbit) == 0 && board.global[1].get_bit(gbit) == 0 && board.global[2].get_bit(gbit) == 0 {
+                        // move that sends opponent into Zugswang should be looked into as well (the bit is not guaranteed to be emtpy)
+                        score += LARGE >> 1;
+                        deep_moves += 1;
+                    }
                 }
                 presort.push((bit, score));
             }
@@ -161,14 +160,14 @@ impl Engine {
             for (i, (mov, _)) in presort.iter().enumerate() {
                 self.ply += 1;
                 board.make_move(*mov);
-                let next_d = depth - 1;
-                // let next_d = if depth < 3 || i < add_deep_moves {
-                //     depth - 1
-                // } else if i < (add_deep_moves + 2) {
-                //     depth - 2
-                // } else {
-                //     depth / 2
-                // };
+                // let next_d = depth - 1;
+                let next_d = if depth < 3 || i < deep_moves {
+                    depth - 1
+                } else if i < (deep_moves + 2) {
+                    depth - 2
+                } else {
+                    depth - 2 - (depth > 3) as i8
+                };
                 score = max(score, -self.negamax(&mut board, -beta, -alpha, next_d));
                 board.undo_move();
                 self.ply -= 1;
