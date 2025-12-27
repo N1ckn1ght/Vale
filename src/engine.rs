@@ -1,4 +1,4 @@
-use std::{cmp::{max, min, Reverse}, time::Instant};
+use std::{cmp::{max, Reverse}, time::Instant};
 use once_cell::sync::Lazy;
 use crate::{bitboard::{GetBit, PopBit}, board::{Board, transform_move_back}, interface::format_eval, lookups::{DIV_LOOKUP, MOD_LOOKUP, SUB_LOOKUP, WIN_LOOKUP}, weights::gen_local_scores};
 
@@ -9,7 +9,8 @@ const NODES_BETWEEN_UPDATES: u64 = 2048;
 // search aux
 const PLY_LIMIT: usize = 81;
 const INF: i16 = 24576;
-const LARGE: i16 = 16384;
+pub const LARGE: i16 = 16384;
+pub const LARGM: i16 = LARGE - 82;
 
 pub static LOCAL_SCORES: Lazy<(Box<[i8]>, Box<[i8]>)> = Lazy::new(|| {
     let mut x = vec![0i8; 262144];
@@ -30,6 +31,7 @@ pub struct Engine {
     tpv:      [[u8; PLY_LIMIT]; PLY_LIMIT],  // triangular table of a principal variation
     tpv_len:  [usize; PLY_LIMIT],            // current length of tpv
     td:       i8,                            // current target depth
+    mate:     bool,                          // is mate detected
 
     /* Interface related */
     pub post: bool,
@@ -48,6 +50,7 @@ impl Default for Engine {
             tpv: [[0; PLY_LIMIT]; PLY_LIMIT],
             tpv_len: [0; PLY_LIMIT],
             td: 0,
+            mate: false,
             post: true,
             evm: false
         }
@@ -90,6 +93,14 @@ impl Engine {
             let temp = self.negamax(board, alpha, beta, self.td);
             if !self.abort {
                 score = temp;
+                if score > LARGM {
+                    if !self.mate {
+                        println!("#DEBUG\tMate detected.");
+                        self.mate = true;
+                    } else {
+                        self.abort = true;
+                    }
+                }
                 if board.turn {
                     score = -score;  // maybe should be not there?
                 }

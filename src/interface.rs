@@ -1,18 +1,26 @@
 use std::{cmp::max, io::{self, stdin}, sync::mpsc::channel, thread, time::Duration};
-use crate::{bitboard::GetBit, board::{Board, ERR_MOV, transform_move, transform_move_back}, engine::{Engine, eval}, lookups::DIV_LOOKUP};
+use crate::{bitboard::GetBit, board::{Board, ERR_MOV, transform_move, transform_move_back}, engine::{Engine, LARGE, LARGM, eval}, lookups::DIV_LOOKUP};
 
 
 pub fn format_eval(eval: i16) -> String {
-    let sign = match eval {
-        x if x > 0 => "+",
-        x if x < 0 => "-",
-        _ => "",
-    };
-    let mut abs = eval.abs();
-    abs /= 6;  // make it similar to chess for human players to look at?
-    let fpart = abs / 100;
-    let spart = abs % 100;
-    format!("{}{}.{:02}", sign, fpart, spart)
+    if eval > LARGM {
+        let ts = 1 + (LARGE - eval) / 2;
+        format!("M+{}", &ts.to_string())
+    } else if eval < -LARGM {
+        let ts = 1 + (LARGE + eval) / 2;
+        format!("M-{}", &ts.to_string())
+    } else {
+        let sign = match eval {
+            x if x > 0 => "+",
+            x if x < 0 => "-",
+            _ => "",
+        };
+        let mut abs = eval.abs();
+        abs /= 6;  // make it similar to chess for human players to look at?
+        let fpart = abs / 100;
+        let spart = abs % 100;
+        format!("{}{}.{:02}", sign, fpart, spart)
+    }
 }
 
 pub fn user_box() {
@@ -96,11 +104,19 @@ pub fn user_box() {
                         println!("Autoplay disabled.");
                         auto = 0;
                     }
-                    if !board.moves.is_empty() {
-                        board.undo_move();
+                    let x = if cmd.len() > 1 {
+                        cmd[1].parse::<u8>().unwrap()
+                    } else {
+                        1
+                    };
+                    for _ in 0..x {
+                        if !board.moves.is_empty() {
+                            board.undo_move();
+                            continue;
+                        }
                         break;
                     }
-                    println!("Unable to undo a move: No move history left!");
+                    break;
                 },
                 "history" => {
                     show_history = !show_history;
@@ -188,6 +204,7 @@ pub fn user_box() {
                         println!("a1             - make move (a1-i9), short and convenient form!");
                         println!("move a1        - make move (a1-i9)");
                         println!("undo           - undo last move");
+                        println!("undo x         - undo x last moves");
                         println!();
                         println!("help engine    - help page on engine commands (there are a lot)");
                         println!();
