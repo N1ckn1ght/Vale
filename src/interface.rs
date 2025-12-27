@@ -16,7 +16,7 @@ pub fn format_eval(eval: i16) -> String {
             _ => "",
         };
         let mut abs = eval.abs();
-        abs /= 6;  // make it similar to chess for human players to look at?
+        abs /= 4;  // make it similar to chess for human players to look at?
         let fpart = abs / 100;
         let spart = abs % 100;
         format!("{}{}.{:02}", sign, fpart, spart)
@@ -53,7 +53,10 @@ pub fn user_box() {
                 2 => {println!("Game ended | Draw")},
                 _ => {}
             }
-            auto = 0;
+            if auto != 0 {
+                auto = 0;
+                engineplays = false;
+            }
         } else if show_movegen {
             println!("Legal moves: {:81b}", legals);
         }

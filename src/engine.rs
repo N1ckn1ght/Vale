@@ -93,13 +93,15 @@ impl Engine {
             let temp = self.negamax(board, alpha, beta, self.td);
             if !self.abort {
                 score = temp;
-                if score > LARGM {
+                if score > LARGM || score < -LARGM {
                     if !self.mate {
                         println!("#DEBUG\tMate detected.");
                         self.mate = true;
                     } else {
                         self.abort = true;
                     }
+                } else {
+                    self.mate = false;
                 }
                 if board.turn {
                     score = -score;  // maybe should be not there?
@@ -314,11 +316,9 @@ pub fn eval(board: &Board) -> i16 {
     olines.sort();
     olines.reverse();
 
-    // with MAX_LOCAL_SCORE = 20 theorietically (im)possible upperbound is (20^3) * 1.9375, and 15500
     score += xlines[0] + xlines[1] / 2 + xlines[2] / 4 + xlines[3] / 8 + xlines[4] / 16;
     score -= olines[0] + olines[1] / 2 + olines[2] / 4 + olines[3] / 8 + olines[4] / 16;
-
-    // there could be an additional weight if free move, feel lazy to implement
+    score /= 2;
 
     score
 }

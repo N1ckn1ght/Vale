@@ -4,10 +4,10 @@ use crate::lookups::{POS_CNT, POS_MASK, gen_local_map};
 
 /* WEIGHTS PER WIN / THREAT / ATTACK / POSSIBILITY */
 
-pub const MAX_LOCAL_SCORE: i8 = 20;
+pub const MAX_LOCAL_SCORE: i8 = 24;
 
 static POS_SCORE: [[i8; 9]; 4] = [
-    [  0, 20, 20, 20, 20, 20, 20, 20, 20],
+    [  0, 24, 24, 24, 24, 24, 24, 24, 24],
     [  0,  8,  9, 10, 10, 10, 10, 10, 10],
     [  0,  4,  6,  8,  9,  9,  9,  9,  9],
     [  0,  1,  2,  3,  4,  5,  6,  8,  8]
@@ -37,13 +37,13 @@ pub fn gen_local_scores(xscores: &mut [i8], oscores: &mut [i8]) {
             continue;
         }
 
-        // heuristic
-        if xbits.count_ones() > 3 && obits.count_ones() == 0 {
+        /* Backfiring flex tape */
+        if xbits.count_ones() > 3 && obits.count_ones() < 2 {
             xscores[permut] = POS_SCORE[3][1];
             oscores[permut] = POS_SCORE[3][((ol >> POS_CNT[3]) & POS_MASK) as usize];
             continue;
         }
-        if obits.count_ones() > 3 && xbits.count_ones() == 0 {
+        if obits.count_ones() > 3 && xbits.count_ones() < 2 {
             xscores[permut] = POS_SCORE[3][((xl >> POS_CNT[3]) & POS_MASK) as usize];
             oscores[permut] = POS_SCORE[3][1];
             continue;
