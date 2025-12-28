@@ -2,7 +2,7 @@ use std::{cmp::max, io::{self, stdin}, sync::mpsc::channel, thread, time::Durati
 use crate::{bitboard::GetBit, board::{Board, ERR_MOV, transform_move, transform_move_back}, engine::{Engine, LARGE, LARGM, eval}, lookups::DIV_LOOKUP};
 
 
-pub fn format_eval(eval: i16) -> String {
+pub fn format_eval(eval: i32) -> String {
     if eval > LARGM {
         let ts = 1 + (LARGE - eval) / 2;
         format!("M+{}", &ts.to_string())
@@ -16,10 +16,11 @@ pub fn format_eval(eval: i16) -> String {
             _ => "",
         };
         let mut abs = eval.abs();
-        abs /= 4;  // make it similar to chess for human players to look at?
-        let fpart = abs / 100;
-        let spart = abs % 100;
-        format!("{}{}.{:02}", sign, fpart, spart)
+        // abs /= 4;  // make it similar to chess for human players to look at?
+        // let fpart = abs / 100;
+        // let spart = abs % 100;
+        // format!("{}{}.{:02}", sign, fpart, spart)
+        format!("{}{}", sign, abs)
     }
 }
 
@@ -327,7 +328,7 @@ pub fn user_box() {
     }
 }
 
-fn run_engine(engine: &mut Engine, board: &mut Board, tl: Option<u128>, td: Option<usize>) -> (u8, i16) {
+fn run_engine(engine: &mut Engine, board: &mut Board, tl: Option<u128>, td: Option<usize>) -> (u8, i32) {
     let (mv, sc) = engine.search(board, tl, td);
     (mv, sc)
 }

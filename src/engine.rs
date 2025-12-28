@@ -8,13 +8,13 @@ const NODES_BETWEEN_UPDATES: u64 = 2048;
 
 // search aux
 const PLY_LIMIT: usize = 81;
-const INF: i16 = 24576;
-pub const LARGE: i16 = 16384;
-pub const LARGM: i16 = LARGE - 82;
+const INF: i32 = 1_073_741_824;
+pub const LARGE: i32 = 536_870_912;
+pub const LARGM: i32 = LARGE - 512;
 
-pub static LOCAL_SCORES: Lazy<(Box<[i8]>, Box<[i8]>)> = Lazy::new(|| {
-    let mut x = vec![0i8; 262144];
-    let mut o = vec![0i8; 262144];
+pub static LOCAL_SCORES: Lazy<(Box<[u8]>, Box<[u8]>)> = Lazy::new(|| {
+    let mut x = vec![0u8; 262144];
+    let mut o = vec![0u8; 262144];
     gen_local_scores(&mut x, &mut o);
     (x.into_boxed_slice(), o.into_boxed_slice())
 });
@@ -67,7 +67,7 @@ impl Engine {
     }
 
     // pass board clone
-    pub fn search(&mut self, board: &mut Board, time_limit_ms: Option<u128>, depth_limit: Option<usize>) -> (u8, i16) {
+    pub fn search(&mut self, board: &mut Board, time_limit_ms: Option<u128>, depth_limit: Option<usize>) -> (u8, i32) {
         self.ts = Instant::now();
         self.tl = time_limit_ms.unwrap_or(31_536_000_000);
         let dl = (depth_limit.unwrap_or(PLY_LIMIT) & !1).clamp(1, PLY_LIMIT) as i8;  // must be an even number
@@ -122,7 +122,7 @@ impl Engine {
         (self.tpv[0][0], score)
     }
 
-    pub fn negamax(&mut self, board: &mut Board, mut alpha: i16, beta: i16, depth: i8) -> i16 {
+    pub fn negamax(&mut self, board: &mut Board, mut alpha: i32, beta: i32, depth: i8) -> i32 {
         if self.nodes & NODES_BETWEEN_UPDATES == 0 {
             self.update();
         }
@@ -133,7 +133,7 @@ impl Engine {
         match board.status {
             3 => {},
             2 => { return 0; },
-            _ => { return -LARGE + self.ply as i16 }
+            _ => { return -LARGE + self.ply as i32 }
         }
 
         let mut legals = board.generate_legal_moves();
@@ -150,7 +150,7 @@ impl Engine {
             let total_moves = legals.count_ones();
             let mut deep_moves = 2;
             let mut zugs = 0;
-            let mut presort: Vec<(u8, i16)> = Vec::with_capacity(total_moves as usize);
+            let mut presort: Vec<(u8, i32)> = Vec::with_capacity(total_moves as usize);
             while legals != 0 {
                 let bit = legals.pop_bit();
                 board.make_move(bit);
@@ -261,7 +261,7 @@ impl Engine {
         alpha  // fail low, we won't choose the branch led to this move
     }
 
-    pub fn post(&self, score: i16) {
+    pub fn post(&self, score: i32) {
         if self.post {
             if self.evm {
                 print!("depth {} / {} / ms {} / nodes {} / pv:", self.td, score, self.ts.elapsed().as_millis(), self.nodes);
@@ -277,7 +277,7 @@ impl Engine {
 }
 
 // Before calling this function, search MUST determine if the game already ended!
-pub fn eval(board: &Board) -> i16 {
+pub fn eval(board: &Board) -> i32 {
     let mut score = 0;
 
     // scores on the local boards, separated
@@ -299,13 +299,13 @@ pub fn eval(board: &Board) -> i16 {
 
     // convert local scores to line scores
     for (i, lookup) in WIN_LOOKUP.iter().enumerate() {
-        let mut xcnt: i16 = 1;
-        let mut ocnt: i16 = 1;
+        let mut xcnt: i32 = 1;
+        let mut ocnt: i32 = 1;
         let mut bits = *lookup;
         while bits != 0 {
             let bit = bits.pop_bit();
-            xcnt *= xscores[bit as usize] as i16;
-            ocnt *= oscores[bit as usize] as i16;
+            xcnt *= xscores[bit as usize] as i32;
+            ocnt *= oscores[bit as usize] as i32;
         }
         xlines[i] = xcnt;
         olines[i] = ocnt;
@@ -316,9 +316,9 @@ pub fn eval(board: &Board) -> i16 {
     olines.sort();
     olines.reverse();
 
-    score += xlines[0] + xlines[1] / 2 + xlines[2] / 4 + xlines[3] / 8 + xlines[4] / 16;
-    score -= olines[0] + olines[1] / 2 + olines[2] / 4 + olines[3] / 8 + olines[4] / 16;
-    score /= 2;
+    /* Eval function itself */
+    score += xlines[0] + xlines[1] / 8;
+    score -= olines[0] + olines[1] / 8;
 
     score
 }
@@ -374,7 +374,7 @@ mod tests {
     }
 
     #[test]
-    fn eval_basic() {
+    fn eval_basics() {
         // may depend on how you implement weights
         let mut board = Board::default();
 
@@ -421,5 +421,49 @@ mod tests {
         board.import_ken("oo1o1o1oo-1ooo1ooo1-oo1o1o1oo-1ooo1ooo1-oo1ooo1oo-1ooo1ooo1-oo1o1o1oo-1ooo1ooo1-oo1o1o1oo -");
         assert!(eval(&board) < 0);
         assert!(eval(&board) > -LARGE);
+    }
+
+    #[test]
+    fn engine_depth_2() {
+        let mut board = Board::default();
+        let mut engine = Engine::default();
+        while board.status > 2 {
+            let (mv, _) = engine.search(&mut board, None, Some(2));
+            board.make_move(mv);
+        }
+        assert_ne!(board.status, 1);
+    }
+
+    #[test]
+    fn engine_depth_4() {
+        let mut board = Board::default();
+        let mut engine = Engine::default();
+        while board.status > 2 {
+            let (mv, _) = engine.search(&mut board, None, Some(4));
+            board.make_move(mv);
+        }
+        assert_ne!(board.status, 1);
+    }
+
+    #[test]
+    fn engine_depth_6() {
+        let mut board = Board::default();
+        let mut engine = Engine::default();
+        while board.status > 2 {
+            let (mv, _) = engine.search(&mut board, None, Some(6));
+            board.make_move(mv);
+        }
+        assert_ne!(board.status, 1);
+    }
+
+    #[test]
+    fn engine_depth_8() {
+        let mut board = Board::default();
+        let mut engine = Engine::default();
+        while board.status > 2 {
+            let (mv, _) = engine.search(&mut board, None, Some(8));
+            board.make_move(mv);
+        }
+        assert_ne!(board.status, 1);
     }
 }
