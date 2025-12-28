@@ -37,20 +37,6 @@ pub fn gen_local_scores(xscores: &mut [u8], oscores: &mut [u8]) {
             continue;
         }
 
-        /* Backfiring flex tape */
-        if xbits.count_ones() > 3 && obits.count_ones() < 2 {
-            xscores[permut] = POS_SCORE[3][1];
-        }
-        if obits.count_ones() > 3 && xbits.count_ones() < 2 {
-            oscores[permut] = POS_SCORE[3][1];
-        }
-        if xbits.count_ones() > 1 && obits.count_ones() == 0 && (xl >> POS_CNT[1]) & POS_MASK == 0 {
-            xscores[permut] = POS_SCORE[3][1];
-        }
-        if obits.count_ones() > 1 && xbits.count_ones() == 0 && (ol >> POS_CNT[1]) & POS_MASK == 0 {
-            oscores[permut] = POS_SCORE[3][1];
-        }
-
         if xscores[permut] == 0 {
             xscores[permut] = POS_SCORE[1][((xl >> POS_CNT[1]) & POS_MASK) as usize] + POS_SCORE[2][((xl >> POS_CNT[2]) & POS_MASK) as usize] + POS_SCORE[3][((xl >> POS_CNT[3]) & POS_MASK) as usize];
             if (xl >> POS_CNT[1]) & POS_MASK != 0 {
