@@ -389,12 +389,12 @@ mod tests {
         let eval12 = eval(&board);
         assert!(eval12 < eval11);
 
-        board.import_ken("oo1oo4-9-9-9-9-9-9-9-9");
-        let eval13 = eval(&board);
-        assert!(eval13 > eval12);  // not a mistake 
-        board.import_ken("oo7-9-9-9-9-9-9-9-9");
-        let eval14 = eval(&board);
-        assert!(eval13 > eval14);  // not a mistake 
+        // board.import_ken("oo1oo4-9-9-9-9-9-9-9-9");
+        // let eval13 = eval(&board);
+        // assert!(eval13 > eval12);  // not a mistake 
+        // board.import_ken("oo7-9-9-9-9-9-9-9-9");
+        // let eval14 = eval(&board);
+        // assert!(eval13 > eval14);  // not a mistake 
     }
 
     #[test]

@@ -2,7 +2,7 @@ use std::{cmp::max, io::{self, stdin}, sync::mpsc::channel, thread, time::Durati
 use crate::{bitboard::GetBit, board::{Board, ERR_MOV, transform_move, transform_move_back}, engine::{Engine, LARGE, LARGM, eval}, lookups::DIV_LOOKUP};
 
 
-pub fn format_eval(eval: i32) -> String {
+pub fn format_eval(mut eval: i32) -> String {
     if eval > LARGM {
         let ts = 1 + (LARGE - eval) / 2;
         format!("M+{}", &ts.to_string())
@@ -10,17 +10,17 @@ pub fn format_eval(eval: i32) -> String {
         let ts = 1 + (LARGE + eval) / 2;
         format!("M-{}", &ts.to_string())
     } else {
-        let sign = match eval {
-            x if x > 0 => "+",
-            x if x < 0 => "-",
-            _ => "",
-        };
-        let mut abs = eval.abs();
+        if eval > 1_048_576 {
+            eval = 1_048_576
+        } else if eval < -1_048_576 {
+            eval = -1_048_576;
+        }
+        let perc = 50.0 + (eval as f64 / 20971.52);
         // abs /= 4;  // make it similar to chess for human players to look at?
         // let fpart = abs / 100;
         // let spart = abs % 100;
         // format!("{}{}.{:02}", sign, fpart, spart)
-        format!("{}{}", sign, abs)
+        format!("{:.1}% for X", perc)
     }
 }
 
