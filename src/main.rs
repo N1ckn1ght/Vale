@@ -1,19 +1,21 @@
 mod bitboard;
 mod lookups;
 mod board;
+mod weights;
 mod engine;
 mod interface;
 
 use std::time::Instant;
-use crate::{board::Board, interface::user_box};
+use crate::{board::Board, engine::LOCAL_SCORES, interface::user_box};
 
 
 fn main() {
-    println!("Hello, world!");
-    let _ = &*engine::LEVAL_WEIGHTS;
-    let _ = &*engine::LEVAL_XPOS;
-    let _ = &*engine::LEVAL_OPOS;
-    println!("Force init completed.");
+    println!("# Hello, world!");
+    println!("# Generating Lookup tables...");
+    let _ = &LOCAL_SCORES.0;
+    let _ = &LOCAL_SCORES.1;
+    println!("# Force init completed.");
+    println!("\n\n\n\n\n\n\n");
 
     // perft(8);
     // println!("(results are a bit skewed because of user_box right after perft idk)\n");
