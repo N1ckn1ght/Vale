@@ -3,7 +3,7 @@
 Vale is an in-development open source engine that plays Ultimate Tic-Tac-Toe (UTTT).  
 Vale is oriented to be fast and precise, but it's a long way before completion.  
 
-![Showcase](vale_v0.1.0-beta.gif)
+![Showcase](https://media0.giphy.com/media/v1.Y2lkPTc5MGI3NjExemFiaGttazBoOXd2Y2w2OXRjYXRuZnh4OGZicTNteGppbnpqd3R0ZiZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/YphGECJ4L0RNwQ4nJ8/giphy.gif)
 
 Currently provides a console interface for a user to interact with a board.  
 Meant to be used via interface program using similar to UCI protocol (in progress).
