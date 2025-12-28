@@ -28,3 +28,4 @@ Vale is licensed under the AGPL-3.0-or-later. See the LICENSE file for the full 
 ## Thanks
 Kivicat  
 Konstantin_Russia  
+[L140-beep](https://github.com/L140-beep)
