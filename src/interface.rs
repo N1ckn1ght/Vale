@@ -1,4 +1,4 @@
-use std::{cmp::max, io::{self, stdin}, sync::mpsc::channel, thread, time::Duration};
+use std::{cmp::{max, min}, io::{self, stdin}, sync::mpsc::channel, thread, time::Duration};
 use crate::{bitboard::GetBit, board::{Board, ERR_MOV, transform_move, transform_move_back}, engine::{Engine, LARGE, LARGM, eval}, lookups::DIV_LOOKUP};
 
 
@@ -9,6 +9,8 @@ pub fn format_eval(mut eval: i32) -> String {
     } else if eval < -LARGM {
         let ts = 1 + (LARGE + eval) / 2;
         format!("M-{}", &ts.to_string())
+    } else if eval == 0 {
+        format!("Draw")
     } else {
         if eval > 1_048_576 {
             eval = 1_048_576
@@ -198,6 +200,7 @@ pub fn user_box() {
                         println!("auto x         - play auto for X");
                         println!("auto o         - play auto for O");
                         println!("auto d         - autoplay for both sides, cannot be stopped until the game is finished");
+                        println!("auto           - cancel autoplay");
                         println!();
                         println!("post           - hide/show engine output (eval score and principal variation)");
                         println!("evm            - switch between chess-like value and real eval engine sees");
@@ -265,8 +268,13 @@ pub fn user_box() {
                         let (mov, sc) = if tdswitch {
                             run_engine(&mut engine, &mut board, None, Some(depth))
                         } else {
-                            let tp = time / 100;
-                            run_engine(&mut engine, &mut board, Some(max(time - tp, 50)), None)
+                            let delay = 3;
+                            let timex = if time <= delay {
+                                1
+                            } else {
+                                time - delay
+                            };
+                            run_engine(&mut engine, &mut board, Some(timex), None)
                         };
                         print!("Best move: {}", transform_move_back(mov));
                         if engine.post {
@@ -316,7 +324,8 @@ pub fn user_box() {
                             println!("Wrong argument for autoplay?");
                         }
                     } else {
-                        println!("Missing argument for autoplay.");
+                        auto = 0b00;
+                        println!("Autoplay cancelled.");
                     }
                 },
                 _ => {
