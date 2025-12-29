@@ -317,8 +317,8 @@ pub fn eval(board: &Board) -> i32 {
     olines.reverse();
 
     /* Eval function itself */
-    score += xlines[0] + xlines[1] / 8;
-    score -= olines[0] + olines[1] / 8;
+    score += xlines[0] + xlines[1] / 4 + xlines[2] / 16 + xlines[3] / 64 + xlines[4] / 256 + xlines[5] / 1024;
+    score -= olines[0] + olines[1] / 4 + olines[2] / 16 + olines[3] / 64 + olines[4] / 256 + olines[5] / 1024;
 
     score
 }
@@ -427,8 +427,13 @@ mod tests {
     fn engine_depth_2() {
         let mut board = Board::default();
         let mut engine = Engine::default();
+        let mut cnt = 0;
         while board.status > 2 {
             let (mv, _) = engine.search(&mut board, None, Some(2));
+            cnt += 1;
+            if cnt > 81 {
+                panic!();
+            }
             board.make_move(mv);
         }
         assert_ne!(board.status, 1);

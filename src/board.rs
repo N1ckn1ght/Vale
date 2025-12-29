@@ -292,6 +292,9 @@ impl Board {
             let op_overlap = self.locals[op_turn] & SUB_LOOKUP[gbit as usize];
             if (my_overlap | op_overlap) & SUB_LOOKUP[gbit as usize] == SUB_LOOKUP[gbit as usize] {
                 self.global[2].set_bit(gbit);
+                if self.global[0] | self.global[1] | self.global[2] == SF {
+                    self.status = 2;
+                }
             }
         }
 
